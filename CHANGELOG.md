@@ -2,6 +2,11 @@
 
 Notable changes to Screen Time Locker, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and [Semantic Versioning](https://semver.org/).
 
+## 6.3.1 - 2026-09-25
+
+- `StatusActivity`: a day with no lock configured no longer reads like missing data. The **Daily limit** tile now shows **Unlimited** instead of "Not set", and **Time left** shows the open-ended `♾️ Until <next locked weekday> <reset time>` instead of a bare dash. When no weekday carries a lock at all, it reads `♾️ Unlimited`.
+- The matching rows in the **Current status** card (Today's limit, Time left) follow the same wording.
+
 ## 6.3.0 - 2026-09-25
 
 - Package renamed from `com.sentinel.timelock` to `com.vortex.timelock` throughout the source, manifest, Shizuku provider authority and documentation. This is a new application identity, so it installs alongside an existing `com.sentinel.timelock` build rather than upgrading it.
