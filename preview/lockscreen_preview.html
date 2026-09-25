@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Screen Time — kiosk lock preview</title>
+<style>
+  /* ------------------------------------------------------------------
+     Faithful CSS reconstruction of KioskDashboard's static view tree.
+     Every measurement is the Java dp/sp value multiplied by 3, i.e. the
+     real projection on a 1080-wide xxhdpi (density 3.0) panel.
+     Palette is copied verbatim from the KioskDashboard constants.
+     ------------------------------------------------------------------ */
+  :root{
+    --bg:#070C14; --card:#131C2B; --card2:#1F2C3E;
+    --txt:#F5F9FF; --muted:#C2CEDE; --faint:#7C8AA0;
+    --accent:#5AC8FA; --good:#34D399; --warn:#FBBF24; --danger:#FB7185;
+    --border:#2C3B52; --accent-soft:#0A2A3A; --danger-soft:#2C1315;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1080px;background:var(--bg)}
+  body{
+    font-family:"Liberation Sans","DejaVu Sans",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    color:var(--txt);
+    line-height:1.2;
+  }
+  .mono{font-family:"DejaVu Sans Mono","Liberation Mono",monospace}
+
+  /* LockActivity root: padding 16 / 18 / 16 / 18 dp */
+  .root{padding:54px 48px}
+
+  /* ---------------- lock clock (very top, phone-lock-screen style) ----------------
+     buildLockClock: column, centered, padding 4/10/4/20 dp -> 12/30/12/60 px.
+     Time 54sp -> 162px (sans-serif-light), date 15sp -> 45px, date pad-top 8dp -> 24px. */
+  .lockclock{text-align:center;padding:30px 12px 60px}
+  .lockclock .time{
+    font-size:162px;font-weight:300;line-height:1;color:var(--txt);letter-spacing:-.01em;
+  }
+  .lockclock .date{font-size:45px;color:var(--muted);padding-top:24px}
+
+  /* ---------------- header ---------------- */
+  .header{display:flex;align-items:center;padding:12px 12px 48px}
+  .mark{
+    width:132px;height:132px;flex:0 0 132px;margin-right:42px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--accent-soft);border:3px solid var(--border);border-radius:42px;
+    font-size:60px;font-weight:700;color:var(--accent);
+  }
+  .titles{flex:1 1 auto;min-width:0}
+  .title{font-size:60px;font-weight:700;color:var(--txt)}
+  .subtitle{font-size:37.5px;color:var(--faint);padding-top:6px}
+  .pill{
+    font-size:33px;font-weight:700;letter-spacing:.10em;
+    color:var(--danger);background:var(--danger-soft);
+    padding:21px 36px;border-radius:60px;white-space:nowrap;
+  }
+
+  /* ---------------- hero card ---------------- */
+  .hero{
+    background:var(--card);border:3px solid var(--border);border-radius:72px;
+    padding:60px 66px;
+  }
+  .hero-label{
+    font-size:33px;font-weight:700;letter-spacing:.14em;color:var(--accent);
+  }
+  .hero-value{
+    font-size:126px;font-weight:700;color:var(--txt);
+    padding:24px 0 18px;letter-spacing:.005em;
+  }
+  .hero-unlock{font-size:42px;font-weight:700;color:var(--good)}
+  .bar{
+    height:30px;margin-top:54px;border-radius:18px;background:var(--card2);
+    display:flex;overflow:hidden;
+  }
+  .bar-fill{height:100%;border-radius:18px;background:var(--danger);width:100%}
+  .hero-note{font-size:37.5px;color:var(--muted);padding-top:30px}
+
+  /* ---------------- stat tiles ---------------- */
+  .grid{margin-top:36px}
+  .tile-row{display:flex}
+  .tile-row + .tile-row{margin-top:30px}
+  .tile{
+    flex:1 1 0;min-width:0;
+    background:var(--card2);border:3px solid var(--border);border-radius:54px;
+    padding:42px 48px;
+  }
+  .tile.left{margin-right:15px}
+  .tile.right{margin-left:15px}
+  .tile-cap{font-size:31.5px;font-weight:700;letter-spacing:.08em;color:var(--faint);white-space:nowrap}
+  .tile-val{font-size:51px;font-weight:700;color:var(--txt);padding-top:18px}
+
+  /* ---------------- recent activity ---------------- */
+  .activity{
+    margin-top:36px;background:var(--card);border:3px solid var(--border);
+    border-radius:60px;padding:48px 54px 42px;
+  }
+  .activity-head{display:flex;align-items:center}
+  .activity-title{flex:1 1 auto;font-size:33px;font-weight:700;letter-spacing:.14em;color:var(--accent)}
+  .activity-count{font-size:33px;color:var(--faint)}
+  .row{padding:33px 0}
+  .row-line{display:flex;align-items:flex-start}
+  .dot{width:27px;height:27px;flex:0 0 27px;margin:15px 36px 0 0;border-radius:50%}
+  .row-body{flex:1 1 auto;min-width:0}
+  .row-title{font-size:42px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row-detail{font-size:36px;color:var(--muted);padding-top:6px;line-height:1.35}
+  .row-time{font-size:33px;color:var(--faint);margin-left:30px;white-space:nowrap;padding-top:6px}
+  .divider{height:3px;background:var(--border)}
+
+  /* ---------------- footer ---------------- */
+  .footer{
+    font-size:36px;color:var(--faint);text-align:center;padding:42px 0 12px;
+  }
+</style>
+</head>
+<body>
+<div class="root">
+
+  <!-- ============ lock clock (very top) ============ -->
+  <div class="lockclock">
+    <div class="time">9:41 PM</div>
+    <div class="date">Friday, 25 September</div>
+  </div>
+
+  <!-- ============ header ============ -->
+  <div class="header">
+    <div class="mark">&#9201;</div>
+    <div class="titles">
+      <div class="title">Screen Time</div>
+      <div class="subtitle">Daily limit enforced by this device</div>
+    </div>
+    <div class="pill">LOCKED</div>
+  </div>
+
+  <!-- ============ hero ============ -->
+  <div class="hero">
+    <div class="hero-label">TIME UNTIL UNLOCK</div>
+    <div class="hero-value mono">01:23:45</div>
+    <div class="hero-unlock">Unlocks today at 23:59</div>
+    <div class="bar"><div class="bar-fill"></div></div>
+    <div class="hero-note">100% of the daily limit used &nbsp;&middot;&nbsp; 3h 00m of 3h 00m</div>
+  </div>
+
+  <!-- ============ tiles ============ -->
+  <div class="grid">
+    <div class="tile-row">
+      <div class="tile left">
+        <div class="tile-cap">SCREEN TIME USED</div>
+        <div class="tile-val mono">3h 00m</div>
+      </div>
+      <div class="tile right">
+        <div class="tile-cap">DAILY LIMIT</div>
+        <div class="tile-val mono">3h 00m</div>
+      </div>
+    </div>
+    <div class="tile-row">
+      <div class="tile left">
+        <div class="tile-cap">BUDGET LEFT</div>
+        <div class="tile-val mono">0s</div>
+      </div>
+      <div class="tile right">
+        <div class="tile-cap">DISPLAY OFF</div>
+        <div class="tile-val mono">Now</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ activity ============ -->
+  <div class="activity">
+    <div class="activity-head">
+      <div class="activity-title">RECENT ACTIVITY</div>
+      <div class="activity-count">4 events &middot; 22:35</div>
+    </div>
+
+    <div class="row">
+      <div class="row-line">
+        <div class="dot" style="background:#FB7185"></div>
+        <div class="row-body">
+          <div class="row-title">Daily limit reached</div>
+          <div class="row-detail">Screen time is used up &mdash; the lock is now enforced</div>
+        </div>
+        <div class="row-time">2m ago</div>
+      </div>
+      <div class="divider"></div>
+    </div>
+
+    <div class="row">
+      <div class="row-line">
+        <div class="dot" style="background:#FB7185"></div>
+        <div class="row-body">
+          <div class="row-title">Lock engaged</div>
+          <div class="row-detail">The kiosk lock screen took over the display</div>
+        </div>
+        <div class="row-time">3m ago</div>
+      </div>
+      <div class="divider"></div>
+    </div>
+
+    <div class="row">
+      <div class="row-line">
+        <div class="dot" style="background:#FBBF24"></div>
+        <div class="row-body">
+          <div class="row-title">Navigation blocked</div>
+          <div class="row-detail">The kiosk consumed the Back key before the system saw it</div>
+        </div>
+        <div class="row-time">9m ago</div>
+      </div>
+      <div class="divider"></div>
+    </div>
+
+    <div class="row">
+      <div class="row-line">
+        <div class="dot" style="background:#7C8AA0"></div>
+        <div class="row-body">
+          <div class="row-title">Screen turned off</div>
+          <div class="row-detail">Panel blanked 30s after the last wake signal</div>
+        </div>
+        <div class="row-time">14m ago</div>
+      </div>
+      <div class="divider"></div>
+    </div>
+  </div>
+
+  <!-- ============ footer ============ -->
+  <div class="footer">Nothing to tap &mdash; the device unlocks on its own.</div>
+
+</div>
+</body>
+</html>

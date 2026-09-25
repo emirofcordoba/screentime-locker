@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ============================================================
+         CRITICAL: this tag MUST be present in the compiled APK.
+         It is what allows another DPC (for example Dhizuku) to hand
+         Device Owner over to this app with
+         DevicePolicyManager.transferOwnership(). Without it the
+         platform throws:
+             java.lang.IllegalArgumentException:
+             Provided target does not support ownership transfer.
+
+         It is placed BEFORE <uses-policies> to match the Android
+         documentation example; the platform parser accepts any order.
+         ============================================================ -->
+    <support-transfer-ownership />
+
+    <uses-policies>
+        <limit-password />
+        <watch-login />
+        <reset-password />
+        <force-lock />
+        <wipe-data />
+        <expire-password />
+        <encrypted-storage />
+        <disable-camera />
+        <disable-keyguard-features />
+        <set-global-proxy />
+        <manage-certificates />
+    </uses-policies>
+</device-admin>

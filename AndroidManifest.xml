@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.vortex.timelock"
+    android:versionCode="14"
+    android:versionName="6.3">
+
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Android 14 (API 34) requires this for a full-screen-intent lock screen. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
+
+    <!-- ===================== SHIZUKU CLIENT =====================
+         The Shizuku client permission. The Shizuku manager (moe.shizuku.privileged.api)
+         grants this per-app at runtime after the user taps Allow in Shizuku's own dialog.
+         With it the app can run shell-level commands (pm list users / pm remove-user /
+         dpm set-device-owner) through the Shizuku binder, no PC and no ADB cable. -->
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
+    <!-- Native biometric identity gate for the setup flow (BiometricAuth). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+    <!-- Optional: without a sensor/fingerprint the console cannot be unlocked. -->
+    <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme"
+        android:defaultToDeviceProtectedStorage="false"
+        android:supportsRtl="true">
+
+        <!-- ===================== SHIZUKU PROVIDER =====================
+             The client-side provider Shizuku binds to. The authority MUST be
+             "<package>.shizuku"; the V3_SUPPORT meta-data opts into the Shizuku
+             v13 (V3) binder handshake used by the bundled 13.1.5 client. -->
+        <meta-data
+            android:name="moe.shizuku.client.V3_SUPPORT"
+            android:value="true" />
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="com.vortex.timelock.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!-- ===================== DEVICE OWNER / ADMIN RECEIVER =====================
+             Receives Device Owner. The device-admin XML carries the
+             <support-transfer-ownership /> tag so another DPC (Dhizuku) can hand
+             ownership over with transferOwnership(). -->
+        <receiver
+            android:name=".TimeLockAdmin"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE" />
+                <action android:name="android.app.action.DEVICE_OWNER_CHANGED" />
+                <action android:name="android.app.action.ACTION_DEVICE_ADMIN_DISABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ===================== BOOT / UPDATE =====================
+             NOW directBootAware. This is what closes the "autostart permission"
+             gap: pre-unlock the receiver must never read credential-encrypted
+             storage, so it only touches the device-protected mirror (BootState)
+             and makes Device-Owner policy calls (Engine.reassertKioskSurface).
+             That path needs no runtime permission, no OEM autostart whitelist and
+             no CE storage, so the kiosk re-arms itself the instant the framework
+             is up and the lock returns on its own after the user unlocks.
+             Post-unlock (BOOT_COMPLETED / QUICKBOOT_POWERON / MY_PACKAGE_REPLACED
+             / USER_UNLOCKED) the receiver runs the full engine exactly as before. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:directBootAware="true"
+            android:exported="true">
+            <intent-filter android:priority="999">
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.USER_UNLOCKED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ===================== ALARM / WATCHDOG ===================== -->
+        <receiver
+            android:name=".EnforcerReceiver"
+            android:exported="false" />
+
+        <!-- ===================== NOTIFICATION KEEP-ALIVE =====================
+             Target of the foreground-service notification's deleteIntent: if the
+             persistent surface is swiped away, re-assert the foreground state so
+             the guard can never be silenced. -->
+        <receiver
+            android:name=".NotificationGuardReceiver"
+            android:exported="false" />
+
+        <!-- ===================== HIDDEN ADMIN ENTRY =====================
+             Dial  *#*#84635#*#*  to open the admin console. -->
+        <receiver
+            android:name=".SecretCodeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SECRET_CODE" />
+                <data android:scheme="android_secret_code" android:host="84635" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ===================== ENGINE ===================== -->
+        <service
+            android:name=".TimeLockService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="screen_on_time_enforcement_kiosk" />
+        </service>
+
+        <!-- ===================== KIOSK LOCK SCREEN =====================
+             DISABLED BY DEFAULT. It is only enabled at runtime while a lock is
+             actually active AND we are the real Device Owner. This prevents the
+             app from ever registering itself as a second launcher and fighting the
+             real one (the cause of the screen-blinking / random-app-launching
+             chaos). It still declares the HOME category so that, while enabled,
+             addPersistentPreferredActivity() can point HOME at it. -->
+        <activity
+            android:name=".LockActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:noHistory="false"
+            android:lockTaskMode="if_whitelisted"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|density"
+            android:theme="@style/LockTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- ===================== ADMIN SETUP (hidden) =====================
+             NOTE: there is deliberately NO android:excludeFromRecents here.
+             That static flag used to drop the console out of the recent-apps /
+             overview list the instant it was launched, i.e. BEFORE the two-step
+             setup confirmation had run (the "premature hide" background
+             glitch). The recent-task visibility blockade is now applied at
+             RUNTIME and strictly after the final two-step setup configuration
+             is confirmed. See Engine.recentsBlockadeConfirmed,
+             Engine.enforceRecentsBlockade and Engine.adminEntryFlags in Engine.java.
+             While setup is still in progress the console stays discoverable in
+             recents. -->
+        <activity
+            android:name=".SetupActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+
+        <!-- ===================== PERMISSION ONBOARDING (first screen) ==========
+             The very first surface of the app. Reached automatically from the
+             launcher dashboard while setup is NOT yet complete (see
+             LauncherDashboard.onCreate). It walks the operator through the
+             pre-requisites, every runtime permission (each approved by a SEPARATE
+             manual tap), the Device Admin grant (ADB command shown verbatim, and a
+             one-tap "approve by Shizuku" that runs pm list users / removes
+             secondary users / sets this app as Device Owner), plus learn-about
+             shortcuts. Only then does it hand over to the setup console. -->
+        <activity
+            android:name=".PermissionActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+
+        <!-- ===================== TRANSITION + MAIN SETUP SCREEN ==========
+             The screen reached automatically once the earlier permission steps are
+             verified active. It re-verifies the System Permissions and the Shizuku
+             / Device Admin grant live, auto-transitions to its main surface the
+             instant allVerified() is true, and hosts the two educational shortcut
+             buttons ("Learn Full App Usage" and "What is Screentime-Locker exactly
+             about?") that open bottom-sheet documentation. CONTINUE hands over to
+             .SetupActivity. singleTop so the auto-advance from .PermissionActivity
+             can never stack duplicates. -->
+        <activity
+            android:name=".MainSetupActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+
+        <!-- ===================== INITIAL ONBOARDING =====================
+             The first screen an operator sees. Shows the mandatory factory-reset
+             / no-accounts / no-auto-sync / reboot warning banner at the very top
+             (bound verbatim from @string/onboarding_warning_banner) and hosts the
+             permission-steps container that the upcoming per-permission rows are
+             injected into. CONTINUE hands over to .PermissionActivity, which owns
+             the actual capability prompts and the Device Admin / Shizuku
+             provisioning chain. -->
+        <activity
+            android:name=".OnboardingActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+
+        <!-- ===================== GATEKEEPER SPLASH (legacy) =====================
+             No longer a launcher entry (the strict single-page GatekeeperActivity
+             below owns MAIN+LAUNCHER). Kept registered and exported because
+             Engine.freezeLaunchers() and SetupActivity's hide-icon action still
+             reference it by class name. Like every launcher-class entry it is
+             frozen at runtime once a full setup is activated. -->
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:icon="@drawable/ic_launcher"
+            android:label="@string/app_name"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
+        <!-- ===================== STRICT SINGLE-PAGE GATEKEEPER (first surface) =====================
+             THE one MAIN+LAUNCHER entry. A single scrolling page that pins the
+             mandatory factory-reset / remove-accounts warning banner to the top
+             (bound verbatim from @string/onboarding_warning_banner), explains the
+             app in a few lines, then walks FOUR prerequisites as four sequential
+             buttons on that SAME page:
+                 1) Autostart (vendor settings - manual)
+                 2) Notifications
+                 3) Battery optimisation exemption
+                 4) Shizuku Device Admin (silent dpm set-device-owner)
+             Progression is refused entirely: every onResume() re-checks all four
+             (GatekeeperActivity.refreshGate) and only the first incomplete step is
+             actionable. Back is a no-op, and CONTINUE stays disabled until all
+             four are approved. Like every launcher entry it is frozen at runtime
+             by Engine.freezeLaunchers() once a full setup is activated. -->
+        <activity
+            android:name=".GatekeeperActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:icon="@drawable/ic_launcher"
+            android:label="@string/app_name"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ===================== LAUNCHER DASHBOARD =====================
+             The read-only dashboard reached from the gatekeeper splash once the
+             acknowledgement is given. It reads the saved configuration (Prefs /
+             ScheduleConfig / Engine) on every tick and shows the remaining
+             screen-on time; from here the operator can open the setup console.
+             It applies no policy and never mutates a preference. It is no longer
+             a launcher entry itself (the gatekeeper owns MAIN+LAUNCHER) but it
+             stays exported so it can still be started by explicit component.
+             NOTE: notification content intents no longer target this screen.
+             Because it is a launcher-class entry, Engine.freezeLaunchers()
+             disables it at runtime once a full setup is activated, which is why
+             taps used to do nothing. Notifications now open .StatusActivity
+             (TimeLockService.statusContentIntent) instead. -->
+        <activity
+            android:name=".LauncherDashboard"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:icon="@drawable/ic_launcher"
+            android:label="@string/app_name" />
+
+        <!-- ===================== STATUS / STATS SCREEN (always available) =====
+             The read-only status page every notification opens: tapping the
+             persistent monitor / countdown notification or the lock notification
+             lands here. It deliberately carries NO intent-filter at all (no
+             MAIN+LAUNCHER and no MAIN+HOME category). It is therefore never
+             returned by Engine.launcherEntries() and is never disabled by
+             Engine.freezeLaunchers() or setLauncherVisible(), so unlike
+             .LauncherDashboard it stays startable by explicit component on a
+             fully locked-in install. It applies no policy and writes no
+             preference: strictly read-only. See StatusActivity.dashboard-less
+             contract in StatusActivity.java. -->
+        <activity
+            android:name=".StatusActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
+    </application>
+</manifest>

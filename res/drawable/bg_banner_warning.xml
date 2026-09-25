@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Prominent warning banner background: solid danger fill, generous rounded
+  corners and a thick contrasting stroke so the banner is the first thing the
+  eye lands on at the top of the onboarding screen.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/banner_bg" />
+    <corners android:radius="16dp" />
+    <stroke android:width="2dp" android:color="@color/banner_stroke" />
+</shape>

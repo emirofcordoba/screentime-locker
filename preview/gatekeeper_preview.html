@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Screen Time Locker — Gatekeeper UI preview</title>
+<style>
+  :root{
+    --bg:#F2F5FA; --surface:#FFFFFF; --surfaceAlt:#EFF3F9; --border:#D3DCE8;
+    --text:#10151F; --textDim:#51607A; --textFaint:#7C8AA0;
+    --accent:#0B7BD6; --accentSoft:#E3F0FF; --onAccent:#FFFFFF;
+    --ok:#0F8A6A; --okSoft:#E1F5EE; --onOk:#FFFFFF;
+    --warn:#B7791F; --warnSoft:#FDF3DC; --onWarn:#FFFFFF;
+    --danger:#D64550; --dangerText:#C0323D; --dangerSoft:#FCE8EA;
+  }
+  .dark{
+    --bg:#0E1420; --surface:#171F2E; --surfaceAlt:#202B3D; --border:#2C3B52;
+    --text:#F2F6FC; --textDim:#A9B6C8; --textFaint:#7C8AA0;
+    --accent:#5AC8FA; --accentSoft:#0A2A3A; --onAccent:#04222E;
+    --ok:#34D399; --okSoft:#08281C; --onOk:#04241A;
+    --warn:#F5B301; --warnSoft:#2E2200; --onWarn:#2E2200;
+    --danger:#F87171; --dangerText:#FCA5A5; --dangerSoft:#2C1315;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#7b8494;font-family:"Roboto","Helvetica Neue",Arial,sans-serif;
+       display:flex;gap:28px;padding:28px;align-items:flex-start;justify-content:center}
+  .phone{width:400px;border-radius:26px;background:var(--bg);color:var(--text);
+         padding:22px 18px 30px;box-shadow:0 18px 50px rgba(0,0,0,.35);min-height:840px}
+  .cap{text-align:center;color:#fff;font-weight:600;font-size:13px;margin-top:12px;letter-spacing:.08em;text-transform:uppercase}
+  .banner{display:flex;gap:10px;align-items:flex-start;background:var(--dangerSoft);
+          border:2px solid var(--danger);border-radius:16px;padding:14px;margin-bottom:18px}
+  .banner .b-ico{flex:0 0 28px;width:28px;height:28px;border-radius:50%;background:var(--danger);
+                 color:var(--dangerSoft);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .banner p{margin:0;color:var(--dangerText);font-weight:700;font-size:13.5px;line-height:1.45}
+  .kicker{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.18em}
+  h1{margin:6px 0 0;font-size:25px;line-height:1.2}
+  .sub{margin:8px 0 16px;color:var(--textDim);font-size:14px;line-height:1.45}
+  .card{background:var(--surface);border:1.5px solid var(--border);border-radius:18px;padding:18px;margin-bottom:16px}
+  .card-head{display:flex;align-items:center}
+  .card-head h2{margin:0;font-size:17px;flex:1}
+  .progress{color:var(--accent);font-size:12.5px;font-weight:700}
+  .steps-intro{margin:8px 0 2px;color:var(--textFaint);font-size:13px;line-height:1.45}
+  .step{display:block;border-radius:16px;padding:14px;margin-top:12px;border:1px solid var(--border);background:var(--surfaceAlt)}
+  .step.done{background:var(--okSoft);border-color:var(--ok)}
+  .step.now{background:var(--accentSoft);border:2px solid var(--accent)}
+  .step.locked{opacity:.6}
+  .step-top{display:flex;align-items:center;gap:12px}
+  .badge{flex:0 0 32px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
+         justify-content:center;font-weight:700;font-size:17px}
+  .badge.done{background:var(--ok);color:var(--onOk)}
+  .badge.now{background:var(--warn);color:var(--onWarn)}
+  .badge.locked{background:var(--surfaceAlt);border:1px solid var(--border);color:var(--textFaint)}
+  .step-title{font-size:15px;font-weight:700}
+  .step-help{font-size:12.5px;color:var(--textDim);margin-top:2px}
+  .step-state{margin-left:auto;font-size:11.5px;font-weight:700;letter-spacing:.06em}
+  .state-done{color:var(--ok)} .state-now{color:var(--warn)} .state-locked{color:var(--textFaint)}
+  .btn{margin-top:12px;width:100%;border:0;border-radius:14px;padding:15px;font-size:14.5px;
+       font-weight:700;color:var(--onAccent);background:var(--accent)}
+  .btn.done{background:var(--ok);color:var(--onOk)}
+  .btn.locked{background:var(--surfaceAlt);color:var(--textFaint);border:1.5px solid var(--border)}
+  .details{margin-top:10px;color:var(--accent);font-size:12.5px;font-weight:700}
+  .details-open{margin-top:6px;color:var(--textFaint);font-size:12.5px;line-height:1.45}
+  .btn.cont{background:var(--ok);color:var(--onOk);opacity:.5;font-size:16px}
+  .hint{margin-top:10px;color:var(--textFaint);font-size:12.5px}
+  .glyph{font-family:"Noto Sans Symbols2","Noto Sans Symbols","DejaVu Sans","Roboto",sans-serif}
+</style>
+</head>
+<body>
+
+  <!-- ============ LIGHT ============ -->
+  <div class="phone">
+    <div class="banner">
+      <div class="b-ico glyph">!</div>
+      <p>⚠️ CRITICAL SYSTEM REQUIREMENT: Before proceeding, you must factory reset your phone OR completely remove all accounts from the device, turn off auto-sync, and reboot your phone.</p>
+    </div>
+
+    <div class="kicker">STRICT GATEKEEPER</div>
+    <h1>Set up your screen lock in 4 steps</h1>
+    <div class="sub">Four quick permissions and you are set. We will guide you through each one — tap a button, come back, and the next step unlocks on its own.</div>
+
+    <div class="card">
+      <div class="card-head"><h2>Turn on 4 things</h2><span class="progress">1 of 4 done</span></div>
+      <div class="steps-intro">Tap the highlighted button, then come back here. Each tap opens the exact settings screen for that one item — nothing is requested all at once.</div>
+
+      <div class="step done">
+        <div class="step-top">
+          <div class="badge done glyph">✓</div>
+          <div><div class="step-title">Autostart</div><div class="step-help">Keeps the lock running after a restart.</div></div>
+          <div class="step-state state-done">Done</div>
+        </div>
+        <button class="btn done">Approved</button>
+        <div class="details">What does this do?</div>
+      </div>
+
+      <div class="step now">
+        <div class="step-top">
+          <div class="badge now glyph">⚠︎</div>
+          <div><div class="step-title">Notifications</div><div class="step-help">Shows your countdown and lock alerts.</div></div>
+          <div class="step-state state-now">Needed</div>
+        </div>
+        <button class="btn">Allow Notifications</button>
+        <div class="details">What does this do?</div>
+      </div>
+
+      <div class="step locked">
+        <div class="step-top">
+          <div class="badge locked glyph">–</div>
+          <div><div class="step-title">Battery</div><div class="step-help">Stops the phone pausing the lock.</div></div>
+          <div class="step-state state-locked">Locked</div>
+        </div>
+        <button class="btn locked">Locked</button>
+        <div class="details">What does this do?</div>
+      </div>
+
+      <div class="step locked">
+        <div class="step-top">
+          <div class="badge locked glyph">–</div>
+          <div><div class="step-title">Device Admin</div><div class="step-help">Lets the app enforce the lock.</div></div>
+          <div class="step-state state-locked">Locked</div>
+        </div>
+        <button class="btn locked">Locked</button>
+        <div class="details">What does this do?</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 6px">Continue</h2>
+      <button class="btn cont">CONTINUE TO SETUP</button>
+      <div class="hint">Approve all four steps above to continue</div>
+    </div>
+  </div>
+
+  <!-- ============ DARK (step expanded shows the "details" text) ============ -->
+  <div class="phone dark">
+    <div class="banner">
+      <div class="b-ico glyph">!</div>
+      <p>⚠️ CRITICAL SYSTEM REQUIREMENT: Before proceeding, you must factory reset your phone OR completely remove all accounts from the device, turn off auto-sync, and reboot your phone.</p>
+    </div>
+
+    <div class="kicker">STRICT GATEKEEPER</div>
+    <h1>Set up your screen lock in 4 steps</h1>
+    <div class="sub">Four quick permissions and you are set. We will guide you through each one — tap a button, come back, and the next step unlocks on its own.</div>
+
+    <div class="card">
+      <div class="card-head"><h2>Turn on 4 things</h2><span class="progress">3 of 4 done</span></div>
+      <div class="steps-intro">Tap the highlighted button, then come back here. Each tap opens the exact settings screen for that one item — nothing is requested all at once.</div>
+
+      <div class="step done">
+        <div class="step-top">
+          <div class="badge done glyph">✓</div>
+          <div><div class="step-title">Autostart</div><div class="step-help">Keeps the lock running after a restart.</div></div>
+          <div class="step-state state-done">Done</div>
+        </div>
+        <button class="btn done">Approved</button>
+      </div>
+
+      <div class="step done">
+        <div class="step-top">
+          <div class="badge done glyph">✓</div>
+          <div><div class="step-title">Notifications</div><div class="step-help">Shows your countdown and lock alerts.</div></div>
+          <div class="step-state state-done">Done</div>
+        </div>
+        <button class="btn done">Approved</button>
+      </div>
+
+      <div class="step done">
+        <div class="step-top">
+          <div class="badge done glyph">✓</div>
+          <div><div class="step-title">Battery</div><div class="step-help">Stops the phone pausing the lock.</div></div>
+          <div class="step-state state-done">Done</div>
+        </div>
+        <button class="btn done">Approved</button>
+      </div>
+
+      <div class="step now">
+        <div class="step-top">
+          <div class="badge now glyph">⚠︎</div>
+          <div><div class="step-title">Device Admin</div><div class="step-help">Lets the app enforce the lock.</div></div>
+          <div class="step-state state-now">Needed</div>
+        </div>
+        <button class="btn">Grant Admin Access</button>
+        <div class="details">Hide details</div>
+        <div class="details-open">Grants Device Owner silently through the running Shizuku service: it lists users, removes every secondary user, then runs dpm set-device-owner — no PC, no cable. When the shell returns success this step is approved.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 6px">Continue</h2>
+      <button class="btn cont">CONTINUE TO SETUP</button>
+      <div class="hint">Approve all four steps above to continue</div>
+    </div>
+  </div>
+
+</body>
+</html>

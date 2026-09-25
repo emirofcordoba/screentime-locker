@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default (LIGHT) theme for the admin console. The window surfaces match the
+         Ui palette so there is no flash of the wrong colour before the first draw.
+         A values-night override supplies the balanced dark counterpart. -->
+    <style name="AppTheme" parent="@android:style/Theme.DeviceDefault">
+        <item name="android:windowBackground">#F2F5FA</item>
+        <item name="android:colorBackground">#F2F5FA</item>
+        <item name="android:textColorPrimary">#10151F</item>
+        <item name="android:textColorSecondary">#51607A</item>
+        <item name="android:textColorHint">#7C8AA0</item>
+        <item name="android:colorAccent">#0B7BD6</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <!-- Kiosk theme: always dark, opaque, no action bar, no wallpaper. This is the
+         full-screen lock screen, so it intentionally does not follow the system
+         light/dark setting. -->
+    <style name="LockTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">#070C14</item>
+        <item name="android:colorBackground">#070C14</item>
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:textColorPrimary">#F5F9FF</item>
+        <item name="android:colorAccent">#5AC8FA</item>
+    </style>
+</resources>

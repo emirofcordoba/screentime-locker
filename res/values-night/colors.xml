@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Onboarding design tokens (DARK counterpart). Applied automatically when the
+  system is in night mode. Same token names, same accent family and contrast as
+  the light set, so the onboarding screen reads identically in either theme.
+-->
+<resources>
+    <!-- window / surfaces -->
+    <color name="screen_bg">#0E1420</color>
+    <color name="surface">#171F2E</color>
+    <color name="surface_alt">#202B3D</color>
+    <color name="border">#2C3B52</color>
+
+    <!-- text -->
+    <color name="text_primary">#F2F6FC</color>
+    <color name="text_secondary">#A9B6C8</color>
+    <color name="text_faint">#7C8AA0</color>
+
+    <!-- accent (primary action) -->
+    <color name="accent">#5AC8FA</color>
+    <color name="accent_text">#04222E</color>
+
+    <!-- warning banner: deep red fill + bright text so it stays the loudest
+         element on a dark screen without glare. -->
+    <color name="banner_bg">#7F1D26</color>
+    <color name="banner_text">#FECACA</color>
+    <color name="banner_stroke">#F87171</color>
+</resources>

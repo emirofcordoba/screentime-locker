@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- DARK counterpart of AppTheme, applied automatically when the system is in
+         night mode. Keeps the same accent family and contrast as the light set so
+         the console reads identically in either theme. LockTheme is intentionally
+         not overridden here (the kiosk is always dark). -->
+    <style name="AppTheme" parent="@android:style/Theme.DeviceDefault">
+        <item name="android:windowBackground">#0E1420</item>
+        <item name="android:colorBackground">#0E1420</item>
+        <item name="android:textColorPrimary">#F2F6FC</item>
+        <item name="android:textColorSecondary">#A9B6C8</item>
+        <item name="android:textColorHint">#7C8AA0</item>
+        <item name="android:colorAccent">#5AC8FA</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

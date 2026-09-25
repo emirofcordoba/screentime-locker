@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+   Screen Time Locker — GATEKEEPER SPLASH layout
+  ============================================================================
+
+  This is the first surface of the app. It is a strict gate: the operator may
+  only move on after ticking the acknowledgement, and the back button is
+  disabled by the Activity (see SplashActivity.onBackPressed).
+
+  Layout contract (top-to-bottom):
+    [1] A WARNING BANNER pinned to the very top. Its message is rendered
+        verbatim from @string/onboarding_warning_banner (factory reset OR remove
+        all accounts / turn off auto-sync / reboot) and is the loudest element.
+    [2] A scrolling content column: kicker + title + subtitle, then the
+        "How the screen lock app works" usage block whose rows are injected at
+        runtime into @id/usageContainer (the screen lock app's FULL usage).
+    [3] The gate: a mandatory acknowledgement CheckBox, the sequential MANUAL
+        permission ladder (3 buttons walked strictly in order, one per permission,
+        each unlocking only after the previous is confirmed), and a CONTINUE button
+        that stays DISABLED until the box is ticked AND all three permissions pass
+        their live checks.
+
+  Responsiveness: the root is a fillViewport ScrollView over a single vertical
+  LinearLayout spanning the viewport width; every block is match_parent /
+  wrap_content with dp spacing and SP typography, so it reflows across portrait,
+  landscape, small phones and tablets from one layout.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/splashScroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/screen_bg"
+    android:fillViewport="true"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:id="@+id/splashContent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="28dp">
+
+        <!-- ============================ [1] WARNING BANNER ============================
+             Prominent, first element on the screen. Danger-filled surface with a
+             thick stroke and elevation lift. The message is a single TextView so
+             the required sentence is never fragmented. -->
+        <LinearLayout
+            android:id="@+id/splashBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_banner_warning"
+            android:elevation="6dp"
+            android:padding="18dp"
+            android:contentDescription="@string/onboarding_warning_banner">
+
+            <TextView
+                android:id="@+id/splashBannerText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/onboarding_warning_banner"
+                android:textColor="@color/banner_text"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:lineSpacingExtra="4dp"
+                android:gravity="start" />
+        </LinearLayout>
+
+        <!-- ============================ kicker + title ============================ -->
+        <TextView
+            android:id="@+id/splashKicker"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/splash_kicker"
+            android:textColor="@color/accent"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.16" />
+
+        <TextView
+            android:id="@+id/splashTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/splash_title"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/splashSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/splash_subtitle"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:lineSpacingExtra="3dp" />
+
+        <!-- ============================ [2] FULL-USAGE BLOCK ============================ -->
+        <TextView
+            android:id="@+id/splashUsageHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/splash_usage_header"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04" />
+
+        <TextView
+            android:id="@+id/splashUsageIntro"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/splash_usage_intro"
+            android:textColor="@color/text_faint"
+            android:textSize="13sp"
+            android:lineSpacingExtra="2dp" />
+
+        <!-- Empty, ready placeholder. The Activity injects one usage row per
+             feature here; the placeholder TextView is removed on first injection. -->
+        <LinearLayout
+            android:id="@+id/usageContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
+            android:background="@drawable/bg_step_card"
+            android:minHeight="96dp"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/usagePlaceholder"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/splash_usage_intro"
+                android:textColor="@color/text_faint"
+                android:textSize="14sp"
+                android:lineSpacingExtra="2dp" />
+        </LinearLayout>
+
+        <!-- Optional deeper documentation, opened as a bottom sheet. -->
+        <Button
+            android:id="@+id/btnLearn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_step_card"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp"
+            android:text="@string/splash_learn_button"
+            android:textAllCaps="false"
+            android:textColor="@color/accent"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <!-- ============================ [3] THE GATE ============================ -->
+        <CheckBox
+            android:id="@+id/ackCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="@string/splash_ack"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:lineSpacingExtra="3dp" />
+
+        <!-- ============================ [3b] SEQUENTIAL PERMISSION LADDER ============================
+             Three manual permission items, walked strictly in order. The Activity
+             injects one row per permission into @id/gateStepsContainer; each row's
+             own Approve button opens the exact system surface for THAT permission,
+             and a row's button stays DISABLED (LOCKED) until every earlier row has
+             passed its live check. The placeholder is removed on first injection. -->
+        <TextView
+            android:id="@+id/splashGateHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/splash_gate_header"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04" />
+
+        <TextView
+            android:id="@+id/splashGateIntro"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/splash_gate_intro"
+            android:textColor="@color/text_faint"
+            android:textSize="13sp"
+            android:lineSpacingExtra="2dp" />
+
+        <LinearLayout
+            android:id="@+id/gateStepsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
+            android:background="@drawable/bg_step_card"
+            android:minHeight="96dp"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/gateStepsPlaceholder"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/splash_gate_placeholder"
+                android:textColor="@color/text_faint"
+                android:textSize="14sp"
+                android:lineSpacingExtra="2dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/enterHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/splash_enter_locked"
+            android:textColor="@color/text_faint"
+            android:textSize="12.5sp" />
+
+        <Button
+            android:id="@+id/btnEnter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_primary_button"
+            android:enabled="false"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:text="@string/splash_enter"
+            android:textAllCaps="false"
+            android:textColor="@color/accent_text"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/backNote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center"
+            android:text="@string/splash_back_blocked"
+            android:textColor="@color/text_faint"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

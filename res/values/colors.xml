@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Onboarding design tokens (LIGHT reference palette).
+
+  These mirror the values in Ui.java so the XML onboarding screen reads with
+  exactly the same colours as the programmatically-drawn console. A values-night
+  override supplies the balanced dark counterpart.
+-->
+<resources>
+    <!-- window / surfaces -->
+    <color name="screen_bg">#F2F5FA</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_alt">#EFF3F9</color>
+    <color name="border">#D3DCE8</color>
+
+    <!-- text -->
+    <color name="text_primary">#10151F</color>
+    <color name="text_secondary">#51607A</color>
+    <color name="text_faint">#7C8AA0</color>
+
+    <!-- accent (primary action) -->
+    <color name="accent">#0B7BD6</color>
+    <color name="accent_text">#FFFFFF</color>
+
+    <!-- warning banner (high-contrast danger surface) -->
+    <color name="banner_bg">#D64550</color>
+    <color name="banner_text">#FFFFFF</color>
+    <color name="banner_stroke">#8F2730</color>
+</resources>

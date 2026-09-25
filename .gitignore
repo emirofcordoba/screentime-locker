@@ -1,0 +1,31 @@
+# Build output
+/build/
+/.build/
+*.apk
+*.idsig
+
+# Android / IDE
+.gradle/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Rotated source snapshots / intermediate caches this project used to keep
+.backup-*
+/gen/
+
+# Never commit real signing material. The bundled test key is intentionally
+# allowed below so a fresh clone builds; anything else is refused.
+*.jks
+*.keystore
+!keystore/timelock-test.jks
+*.p12
+*.pfx
+keystore.pass
