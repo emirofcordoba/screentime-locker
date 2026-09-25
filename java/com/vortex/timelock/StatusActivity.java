@@ -11,6 +11,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -177,20 +178,25 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
         }
 
         // ---- tiles ----
+        // A day with no lock configured is not a missing value: it is unlimited.
+        // The daily limit reads "Unlimited" and the time left is open-ended until
+        // the next weekday that actually locks begins its accounting window.
+        boolean unlimitedToday = limit <= 0L;
         setIfChanged(tileUsed, KioskSnapshot.shortDuration(used));
-        setIfChanged(tileLimit, limit > 0L ? KioskSnapshot.shortDuration(limit) : "Not set");
-        setIfChanged(tileLeft, limit > 0L ? KioskSnapshot.shortDuration(remaining) : "\u2014");
+        setIfChanged(tileLimit, unlimitedToday ? "Unlimited" : KioskSnapshot.shortDuration(limit));
+        setIfChanged(tileLeft, unlimitedToday ? unlimitedLeftText(now) : KioskSnapshot.shortDuration(remaining));
         setIfChanged(tileGuard, Prefs.warnSeconds(this) + "s");
 
         // ---- current status card ----
         setIfChanged(stLockState, locked ? "Locked" : "Not locked");
         setIfChanged(stAutoLock, reconfig ? "Paused"
                 : (limit > 0L ? "Armed" : "Off"));
-        setIfChanged(stTodayLimit, limit > 0L
-                ? ScheduleConfig.human(limit / 60_000L) : "No lock today");
+        setIfChanged(stTodayLimit, unlimitedToday
+                ? "Unlimited" : ScheduleConfig.human(limit / 60_000L));
         setIfChanged(stUsed, KioskSnapshot.shortDuration(used)
                 + (limit > 0L ? "  (" + (permille / 10) + "%)" : ""));
-        setIfChanged(stLeft, limit > 0L ? KioskSnapshot.shortDuration(remaining) : "\u2014");
+        setIfChanged(stLeft, unlimitedToday
+                ? unlimitedLeftText(now) : KioskSnapshot.shortDuration(remaining));
         setIfChanged(stReset, clockFmt.format(new Date(Engine.windowEnd(this, now))));
         setIfChanged(stAnchor, clockFmt.format(new Date(Engine.windowStart(this, now))));
         setIfChanged(stSchedule, ScheduleConfig.summary(this));
@@ -208,6 +214,54 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
         renderActivity(now);
 
         setIfChanged(updatedNote, "Live \u00b7 updated " + stampFmt.format(new Date(now)));
+    }
+
+    /**
+     * The next weekday (1=Sun .. 7=Sat), strictly after today, whose effective
+     * limit is positive \u2014 i.e. the day the lock resumes after an unlocked day.
+     * Returns 0 when no weekday within the coming week carries a lock.
+     */
+    private int nextLockedDow(long now) {
+        int today = Engine.dayOfWeek(now);
+        for (int step = 1; step <= 7; step++) {
+            int dow = ((today - 1 + step) % 7) + 1;
+            if (ScheduleConfig.effectiveLimitMs(this, dow) > 0L) return dow;
+        }
+        return 0;
+    }
+
+    /**
+     * The instant the lock resumes: the reset (anchor) time on the next locked
+     * weekday. Returns 0 when no weekday within the coming week carries a lock.
+     */
+    private long nextLockResetMs(long now) {
+        int dow = nextLockedDow(now);
+        if (dow == 0) return 0L;
+        int steps = ((dow - Engine.dayOfWeek(now)) + 7) % 7;
+        if (steps == 0) steps = 7;
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(now);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        cal.add(Calendar.DAY_OF_MONTH, steps);
+        int anchor = Prefs.anchorMin(this);
+        cal.set(Calendar.HOUR_OF_DAY, anchor / 60);
+        cal.set(Calendar.MINUTE, anchor % 60);
+        return cal.getTimeInMillis();
+    }
+
+    /**
+     * The TIME LEFT read-out on an unlocked (no-lock) day: open-ended until the
+     * next locked weekday's reset, or a plain "Unlimited" when no weekday locks.
+     */
+    private String unlimitedLeftText(long now) {
+        int dow = nextLockedDow(now);
+        long reset = nextLockResetMs(now);
+        if (dow == 0 || reset <= 0L) return "\u267E\uFE0F Unlimited";
+        return "\u267E\uFE0F Until " + ScheduleConfig.dayName(dow, false)
+                + " " + clockFmt.format(new Date(reset));
     }
 
     /**
