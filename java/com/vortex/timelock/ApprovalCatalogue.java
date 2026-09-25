@@ -96,7 +96,7 @@ final class ApprovalCatalogue {
                 .trigger(ApprovalTrigger.ACK_TICKED)
                 .title("Step 1 of 2 \\u2014 Review the policy")
                 .message("Daily interval:  " + human(Prefs.limitMs(c) / 60_000L)
-                        + "\nResets at:  " + hhmm(Prefs.anchorMin(c))
+                        + "\nResets at:  " + hhmm(c, Prefs.anchorMin(c))
                         + "\nWeekly schedule:  " + ScheduleConfig.summary(c)
                         + "\n\nWhen the interval is used up a full-screen kiosk appears with the "
                         + "time left and the moment it lifts. There is no exit but waiting, no "
@@ -135,15 +135,12 @@ final class ApprovalCatalogue {
     }
 
     /**
-     * "11:59 PM" from a minute-of-day. Same clock convention as the lock screen,
-     * so every surface that names a wall-clock instant agrees.
+     * The reset instant from a minute-of-day, rendered in the user's own 12/24-hour
+     * form (see {@link TimeFmt}), so every surface that names a wall-clock instant
+     * agrees.
      */
-    private static String hhmm(int anchorMin) {
-        int m = ((anchorMin % 1440) + 1440) % 1440;
-        int h = m / 60;
-        int h12 = h % 12;
-        if (h12 == 0) h12 = 12;
-        return String.format(Locale.US, "%d:%02d %s", h12, m % 60, h < 12 ? "AM" : "PM");
+    private static String hhmm(Context c, int anchorMin) {
+        return TimeFmt.clockFromMinuteOfDay(c, anchorMin);
     }
 
     private static String human(long minutes) {

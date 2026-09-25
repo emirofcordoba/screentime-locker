@@ -87,9 +87,6 @@ public class LauncherDashboard extends Activity implements HardwareTick.Sink {
     private Button consoleBtn;
     private TextView readOnlyNote;
 
-    private final SimpleDateFormat resetFmt = new SimpleDateFormat("HH:mm", Locale.US);
-    private final SimpleDateFormat stampFmt = new SimpleDateFormat("HH:mm:ss", Locale.US);
-
     // ==================================================================== lifecycle
 
     @Override
@@ -195,12 +192,12 @@ public class LauncherDashboard extends Activity implements HardwareTick.Sink {
         setIfChanged(cfgDaily, base > 0L ? ScheduleConfig.human(base / 60_000L) : "Not set");
         setIfChanged(cfgToday, limit > 0L
                 ? ScheduleConfig.human(limit / 60_000L) : "No lock today");
-        setIfChanged(cfgReset, resetFmt.format(new Date(Engine.windowEnd(this, now))));
+        setIfChanged(cfgReset, TimeFmt.clock(this, Engine.windowEnd(this, now)));
         setIfChanged(cfgWarn, warn + " seconds");
         setIfChanged(cfgSchedule, ScheduleConfig.summary(this));
         setIfChanged(cfgState, stateLine(activated, owner, settingsLocked));
 
-        setIfChanged(updatedNote, "Live \u00b7 updated " + stampFmt.format(new Date(now)));
+        setIfChanged(updatedNote, "Live \u00b7 updated " + TimeFmt.clockSeconds(this, now));
     }
 
     /**
@@ -219,7 +216,7 @@ public class LauncherDashboard extends Activity implements HardwareTick.Sink {
 
     private String unlockNote(long atMs, long nowMs) {
         if (atMs <= 0L) return "Unlocks once the timer finishes";
-        return "Unlocks at " + resetFmt.format(new Date(atMs));
+        return "Unlocks at " + TimeFmt.clock(this, atMs);
     }
 
     private static String stateLine(boolean activated, boolean owner, boolean settingsLocked) {

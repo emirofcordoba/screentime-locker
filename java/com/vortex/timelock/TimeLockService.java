@@ -709,7 +709,7 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) b = new Notification.Builder(this, CH_LOCK);
         else b = new Notification.Builder(this);
-        String when = LockActivity.formatClock(untilMs);
+        String when = LockActivity.formatClock(this, untilMs);
         b.setSmallIcon(R.drawable.ic_launcher)
                 .setContentTitle(getString(R.string.lock_title))
                 .setContentText(getString(R.string.lock_subtitle) + "  (" + when + ")")

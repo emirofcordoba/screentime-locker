@@ -79,9 +79,6 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
     private TextView actLast, actList;
     private TextView updatedNote;
 
-    private final SimpleDateFormat clockFmt = new SimpleDateFormat("HH:mm", Locale.US);
-    private final SimpleDateFormat stampFmt = new SimpleDateFormat("HH:mm:ss", Locale.US);
-
     // ==================================================================== lifecycle
 
     @Override
@@ -98,6 +95,23 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
         super.onResume();
         resumed = true;
         HardwareTick.subscribe(this);
+        // PERMISSION PERMANENCE: this is the ONE surface that stays startable on a
+        // fully locked-in install (no intent-filter, so it is never returned by
+        // Engine.launcherEntries() and never frozen). The gatekeeper's own
+        // battery re-assert at GatekeeperActivity.onResume is unreachable after a
+        // full setup, because freezeLaunchers() disables that component. So the
+        // battery-optimization exemption - the one state Android gives NO
+        // Device-Owner pin for - is re-requested from HERE. Owner-gated, gated on a
+        // completed setup and rate-limited inside the call, so it is a free no-op
+        // while the exemption is in force.
+        Engine.reassertBatteryIfLost(this);
+        // PERMISSION PERMANENCE: re-pin every declared runtime permission
+        // (notification included) to its non-revocable GRANTED state. This is a
+        // DPM-policy-only call - no storage write, no thread, no wake lock - so it
+        // respects this screen's read-only-preference contract while closing the
+        // window between a permission being granted and the next boot / power-state
+        // / job pass. Owner-gated, so it is free when we are not the Device Owner.
+        Engine.reassertRuntimePins(this);
     }
 
     @Override
@@ -148,7 +162,7 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
             long until = Math.max(0L, Engine.lockUntilMs(this, now) - now);
             setIfChanged(heroLabel, "TIME UNTIL UNLOCK");
             setIfChanged(heroValue, KioskSnapshot.hms(until));
-            setIfChanged(heroNote, "Unlocks at " + clockFmt.format(new Date(Engine.lockUntilMs(this, now))));
+            setIfChanged(heroNote, "Unlocks at " + TimeFmt.clock(this, Engine.lockUntilMs(this, now)));
         } else if (reconfig) {
             setIfChanged(heroLabel, "AUTO-LOCK PAUSED");
             setIfChanged(heroValue, limit > 0L ? KioskSnapshot.hms(remaining) : "\u2014");
@@ -159,7 +173,7 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
             setIfChanged(heroValue, KioskSnapshot.hms(remaining));
             setIfChanged(heroNote, remaining <= 0L
                     ? "Limit reached \u2014 locking now"
-                    : "Locks at " + clockFmt.format(new Date(lockAt)) + " if the screen stays on");
+                    : "Locks at " + TimeFmt.clock(this, lockAt) + " if the screen stays on");
         } else {
             setIfChanged(heroLabel, "TIME UNTIL LOCK");
             setIfChanged(heroValue, "\u2014");
@@ -197,8 +211,8 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
                 + (limit > 0L ? "  (" + (permille / 10) + "%)" : ""));
         setIfChanged(stLeft, unlimitedToday
                 ? unlimitedLeftText(now) : KioskSnapshot.shortDuration(remaining));
-        setIfChanged(stReset, clockFmt.format(new Date(Engine.windowEnd(this, now))));
-        setIfChanged(stAnchor, clockFmt.format(new Date(Engine.windowStart(this, now))));
+        setIfChanged(stReset, TimeFmt.clock(this, Engine.windowEnd(this, now)));
+        setIfChanged(stAnchor, TimeFmt.clock(this, Engine.windowStart(this, now)));
         setIfChanged(stSchedule, ScheduleConfig.summary(this));
 
         // ---- enforcement card ----
@@ -213,7 +227,7 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
         // ---- recent activity ----
         renderActivity(now);
 
-        setIfChanged(updatedNote, "Live \u00b7 updated " + stampFmt.format(new Date(now)));
+        setIfChanged(updatedNote, "Live \u00b7 updated " + TimeFmt.clockSeconds(this, now));
     }
 
     /**
@@ -261,7 +275,7 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
         long reset = nextLockResetMs(now);
         if (dow == 0 || reset <= 0L) return "\u267E\uFE0F Unlimited";
         return "\u267E\uFE0F Until " + ScheduleConfig.dayName(dow, false)
-                + " " + clockFmt.format(new Date(reset));
+                + " " + TimeFmt.clock(this, reset);
     }
 
     /**

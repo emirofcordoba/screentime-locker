@@ -73,7 +73,7 @@ final class ApprovalSequence {
         out.add(new Step(
                 "Review what will be locked in",
                 "Daily interval:  " + humanDuration(Prefs.limitMs(c) / 60_000L)
-                        + "\nResets at:  " + hhmm(Prefs.anchorMin(c))
+                        + "\nResets at:  " + hhmm(c, Prefs.anchorMin(c))
                         + "\nWeekly schedule:  " + ScheduleConfig.summary(c)
                         + "\n\nWhen the interval is used up a full-screen kiosk lock appears with "
                         + "the time left and the unlock time. There is no exit except waiting. "
@@ -273,16 +273,13 @@ final class ApprovalSequence {
     // =====================================================================
 
     /**
-     * "11:59 PM" from a minute-of-day. Same clock convention as the lock screen:
-     * the operator approving a change reads the reset instant exactly as the
-     * locked-out user will see it. (Durations keep their own HH:MM:SS form.)
+     * The reset instant from a minute-of-day, rendered in the user's own 12/24-hour
+     * form (see {@link TimeFmt}): the operator approving a change reads it exactly
+     * as the locked-out user will see it on the kiosk. (Durations keep their own
+     * HH:MM:SS form and never route through here.)
      */
-    private static String hhmm(int anchorMin) {
-        int m = ((anchorMin % 1440) + 1440) % 1440;
-        int h = m / 60;
-        int h12 = h % 12;
-        if (h12 == 0) h12 = 12;
-        return String.format(Locale.US, "%d:%02d %s", h12, m % 60, h < 12 ? "AM" : "PM");
+    private static String hhmm(Context c, int anchorMin) {
+        return TimeFmt.clockFromMinuteOfDay(c, anchorMin);
     }
 
     private static String humanDuration(long minutes) {

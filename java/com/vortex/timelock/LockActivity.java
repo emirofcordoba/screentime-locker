@@ -421,12 +421,14 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
     }
 
     /**
-     * "Wed 10:35 PM" — the status-bar countdown formats through here too, so the
-     * lock screen and the shade can never disagree about the unlock instant, nor
-     * about whether it is spoken in 12-hour time (it always is).
+     * "Wed 10:35 PM" / "Wed 22:35" — the status-bar countdown formats through
+     * here too, so the lock screen and the shade can never disagree about the
+     * unlock instant or its hour form. The 12/24-hour choice follows the user's
+     * own system setting (see {@link TimeFmt}).
      */
-    static String formatClock(long ms) {
-        return new SimpleDateFormat("EEE h:mm a", Locale.US).format(new Date(ms));
+    static String formatClock(Context c, long ms) {
+        String day = new SimpleDateFormat("EEE", Locale.US).format(new Date(ms));
+        return day + " " + TimeFmt.clock(c, ms);
     }
 
     private GradientDrawable rounded(int fill, int radiusDp, int strokeColor) {

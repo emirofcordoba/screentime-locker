@@ -442,7 +442,7 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
         LinearLayout c = card();
         box.addView(c);
         c.addView(cardTitle("3  \u00b7  Reset time"));
-        c.addView(body("The counter returns to zero at this time every day (24-hour clock)."));
+        c.addView(body("The counter returns to zero at this time every day. Enter the hour on the 24-hour clock; the preview matches your device's time format."));
 
         c.addView(divider());
         timeRow(c, "Hour", ahIn, 0, 23);
@@ -631,17 +631,13 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
     }
 
     /**
-     * "11:59 PM" from a minute-of-day. The console and the lock screen speak the
-     * same clock: an operator who configures "resets at 11:59 PM" is reading
-     * exactly the string the locked-out user will see on the kiosk.
+     * The reset instant from a minute-of-day, rendered in the user's own 12/24-hour
+     * form (see {@link TimeFmt}). The console and the lock screen speak the same
+     * clock: an operator who configures the reset time reads exactly the string the
+     * locked-out user will see on the kiosk.
      */
-    static String clock12(int minuteOfDay) {
-        int m = ((minuteOfDay % 1440) + 1440) % 1440;
-        int h = m / 60;
-        int mm = m % 60;
-        int h12 = h % 12;
-        if (h12 == 0) h12 = 12;
-        return String.format(Locale.US, "%d:%02d %s", h12, mm, h < 12 ? "AM" : "PM");
+    static String clockAt(Context c, int minuteOfDay) {
+        return TimeFmt.clockFromMinuteOfDay(c, minuteOfDay);
     }
 
     private void updatePreview() {
@@ -658,7 +654,7 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
         if (resetPreview != null) {
             int ah = clamp(parseInt(ahIn, 0), 0, 23);
             int am = clamp(parseInt(amIn, 0), 0, 59);
-            resetPreview.setText("Resets every day at  " + clock12(ah * 60 + am));
+            resetPreview.setText("Resets every day at  " + clockAt(this, ah * 60 + am));
             resetPreview.setTextColor(ui.accent);
         }
         if (warnPreview != null && warnSel != null) {
@@ -733,7 +729,7 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
         tvLimit.setText(lim > 0 ? humanDuration(lim / 60_000L) : "not set");
         tvLimit.setTextColor(lim > 0 ? ui.text : ui.warn);
 
-        tvReset.setText(clock12(Prefs.anchorMin(this)));
+        tvReset.setText(clockAt(this, Prefs.anchorMin(this)));
 
         tvWarn.setText(Prefs.optScreenOff(this) ? (Prefs.warnSeconds(this) + "s warning") : "off");
         tvWarn.setTextColor(Prefs.optScreenOff(this) ? ui.text : ui.textDim);

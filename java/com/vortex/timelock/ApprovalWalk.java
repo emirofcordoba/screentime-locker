@@ -192,7 +192,7 @@ final class ApprovalWalk {
             if (cp.kind == ApprovalCheckpoint.Kind.DEADLINE) {
                 long target = ApprovalLedger.deadline(a, scope, index);
                 TextView clock = new TextView(a);
-                clock.setText("Deadline: " + DateFormat.format("HH:mm:ss", target)
+                clock.setText("Deadline: " + TimeFmt.clockSeconds(a, target)
                         + "   (" + cp.dwellMs / 1000L + "s from the moment this first appeared)");
                 clock.setTextSize(13f);
                 clock.setTypeface(android.graphics.Typeface.MONOSPACE);

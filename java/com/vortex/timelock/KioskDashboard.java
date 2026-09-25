@@ -111,15 +111,11 @@ final class KioskDashboard extends LinearLayout {
     private static final int ACTIVITY_ROWS = 4;
 
     /**
-     * "11:59 PM" — every wall-clock time the dashboard ever shows.
-     *
-     * <p>The lock screen is read by the person who is locked out: under glare,
-     * at a glance, with no patience for arithmetic. A 24-hour stamp forces a
-     * mental conversion, so the unlock instant is spoken in the 12-hour form the
-     * reader already uses out loud — with an explicit meridiem, never a bare
-     * {@code 23:59} that has to be decoded before it means anything.
+     * Every wall-clock time the dashboard shows (the top lock clock, the
+     * activity stamp, the "Unlocks ..." label) routes through {@link #wallFmt()},
+     * which reads the user's own 12/24-hour system setting, so the kiosk never
+     * contradicts the clock in the settings app.
      */
-    private final SimpleDateFormat clock12 = new SimpleDateFormat("h:mm a", Locale.US);
     /** "Wed" — only consulted when the unlock lands past tomorrow. */
     private final SimpleDateFormat weekday = new SimpleDateFormat("EEE", Locale.US);
 
@@ -571,12 +567,29 @@ final class KioskDashboard extends LinearLayout {
         setIfChanged(activityCount, shown == 0
                 ? ""
                 : shown + (shown == 1 ? " event" : " events")
-                        + " \u00b7 " + clock12.format(new Date(s.nowMs)));
+                        + " \u00b7 " + wallFmt().format(new Date(s.nowMs)));
     }
 
     // =====================================================================
     //  Lock clock
     // =====================================================================
+
+    /**
+     * Wall-clock formatter honouring the user's 12/24-hour setting, rebuilt only
+     * when the hour form actually flips. Shared by the top clock, the activity
+     * stamp and the unlock label, so every time the kiosk prints agrees. Callable
+     * from any render path, not just {@link #renderClock}, so a change made in the
+     * settings app is picked up on the very next bind without waiting a minute.
+     */
+    private SimpleDateFormat wallFmt() {
+        boolean h24 = TimeFmt.is24(getContext());
+        if (clockFmt == null || h24 != clockIs24) {
+            clockIs24 = h24;
+            clockFmt = new SimpleDateFormat(h24 ? "HH:mm" : "h:mm a", Locale.US);
+            dateFmt  = new SimpleDateFormat("EEEE, d MMMM", Locale.US);
+        }
+        return clockFmt;
+    }
 
     /**
      * Paint the top clock, but at most once per wall-clock minute.
@@ -592,17 +605,9 @@ final class KioskDashboard extends LinearLayout {
         if (minute == clockMinute) return;
         clockMinute = minute;
 
-        boolean h24;
-        try { h24 = DateFormat.is24HourFormat(getContext()); }
-        catch (Throwable t) { h24 = false; }
-        if (clockFmt == null || h24 != clockIs24) {
-            clockIs24 = h24;
-            clockFmt = new SimpleDateFormat(h24 ? "HH:mm" : "h:mm a", Locale.US);
-            dateFmt  = new SimpleDateFormat("EEEE, d MMMM", Locale.US);
-        }
-
+        SimpleDateFormat fmt = wallFmt();
         Date now = new Date(nowMs);
-        setIfChanged(lockClock, clockFmt.format(now));
+        setIfChanged(lockClock, fmt.format(now));
         setIfChanged(lockDate, dateFmt.format(now));
     }
 
@@ -647,14 +652,14 @@ final class KioskDashboard extends LinearLayout {
     }
 
     /**
-     * "Unlocks today at 11:59 PM" / "Unlocks Wed at 11:59 PM" — never an ISO
-     * stamp, and never a 24-hour one. The meridiem ({@code AM}/{@code PM}) is
-     * always present, so the answer to "when will it unlock" is readable in one
-     * glance instead of one conversion.
+     * "Unlocks today at 11:59 PM" / "Unlocks Wed at 11:59 PM", or "Unlocks today
+     * at 23:59" on a 24-hour device — never an ISO stamp. The hour form follows
+     * the user's own system 12/24-hour setting (via {@link #wallFmt()}), so the
+     * unlock instant reads exactly as the phone's own clock would print it.
      */
     private String unlockLabel(long atMs, long nowMs) {
         if (atMs <= 0L) return "Unlocks once the timer finishes";
-        String time = clock12.format(new Date(atMs));
+        String time = wallFmt().format(new Date(atMs));
         Calendar a = Calendar.getInstance();
         a.setTimeInMillis(atMs);
         Calendar n = Calendar.getInstance();
