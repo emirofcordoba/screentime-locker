@@ -459,6 +459,17 @@ final class Engine {
 
         restrict(d, admin, UserManager.DISALLOW_ADD_USER, enable);
         restrict(d, admin, UserManager.DISALLOW_USER_SWITCH, enable);
+        // PERMANENT APP-CONTROL STRIP. Once the commitment is activated the whole
+        // app-management surface disappears: Settings > Apps - including every
+        // per-app "Permissions" and "Special app access" page - is disabled, so no
+        // permission, runtime OR special-access (exact alarms, full-screen intent,
+        // battery-optimization exemption), can be granted or revoked for ANY app,
+        // and no app can be uninstalled, force-stopped or have its data cleared.
+        // Together with the package-scoped pinning below this is the "no permission
+        // can later be enabled or disabled" guarantee. It is device-wide on purpose:
+        // this is a kiosk / commitment device. It is cleared again only when the
+        // commitment itself is torn down (enable == false).
+        restrict(d, admin, UserManager.DISALLOW_APPS_CONTROL, enable);
         // Root-level restrictions (blocking Safe Mode / Factory Reset) are routed
         // through the fail-safe approval barrier: they engage ONLY when a live
         // standing warrant minted by the tiered approval walk matches the live

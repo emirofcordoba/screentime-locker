@@ -10,8 +10,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
+import android.app.AlarmManager;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
@@ -115,6 +118,58 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
 
     /** The low-level countdown optimiser: owns the status-bar surface. */
     private LiveCountdown liveCountdown;
+
+    // ==================================================================
+    // PERMISSION-INDEPENDENT BOUNDARY TIMER
+    // ==================================================================
+    //
+    // The engine's primary trigger is a PASSIVE exact AlarmManager alarm (see
+    // scheduleLimitTick / PowerGovernor). That is the zero-wake-lock path and it
+    // is used whenever the exact-alarm special access is available. But
+    // SCHEDULE_EXACT_ALARM is a user-revocable "Special app access" toggle, so on
+    // a device where it (or, in principle, every permission) is switched off the
+    // armExact() call degrades to an INEXACT alarm and the lock boundary could
+    // fire late while the panel stays on.
+    //
+    // To hold the "works instantaneously even with the permissions revoked"
+    // guarantee this service - already a FOREGROUND service, so its main looper
+    // is alive and precise while the screen is on - also arms ONE in-process
+    // single-shot timer at the same deadline whenever exact alarms are NOT
+    // available. It is posted only while the panel is interactive, cancelled the
+    // instant the panel goes off, on lock and on destroy, so no timer ever runs
+    // during the dark/idle window and the idle-power model is untouched on the
+    // normal (permitted) path.
+    private Handler uiHandler;
+    private final Runnable limitFallback = new Runnable() {
+        @Override public void run() { recheck("timer:tick"); }
+    };
+
+    /** True when an exact (allow-while-idle) alarm can actually be scheduled. */
+    private boolean exactAlarmsAvailable() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true;
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        // Conservative: unknown AlarmManager means we assume the fallback is needed.
+        return am != null && am.canScheduleExactAlarms();
+    }
+
+    /**
+     * Arm/re-arm the in-process single-shot boundary timer. Used ONLY when exact
+     * alarms are unavailable, so the normal path keeps the zero-Handler idle
+     * model. The callback re-runs the ordinary recheck, which either enters the
+     * lock or re-arms against the (only ever shrinking) remaining budget.
+     */
+    private void armFallbackTimer(long atMs) {
+        if (uiHandler == null) uiHandler = new Handler(Looper.getMainLooper());
+        long delay = atMs - System.currentTimeMillis();
+        if (delay < 0L) delay = 0L;
+        uiHandler.removeCallbacks(limitFallback);
+        uiHandler.postDelayed(limitFallback, delay);
+        Log.i(TAG, "fallback boundary timer in " + (delay / 1000) + "s (exact alarm n/a)");
+    }
+
+    private void clearFallbackTimer() {
+        if (uiHandler != null) uiHandler.removeCallbacks(limitFallback);
+    }
 
     @Override
     public void onCreate() {
@@ -228,6 +283,9 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
         running = false;
         sLive = null;
         lockApplied = false;
+        // Drop any in-process boundary timer so a restart cannot inherit one.
+        clearFallbackTimer();
+        uiHandler = null;
         if (liveCountdown != null) {
             Log.i(TAG, "destroy " + liveCountdown.report());
             liveCountdown.stop();
@@ -487,9 +545,19 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
         // genuinely moved (session banked, re-anchored, alarm delivered).
         PowerGovernor.armPassiveExact(this, now + rem,
                 EnforcerReceiver.ACTION_TICK, EnforcerReceiver.REQ_TICK);
+
+        // PERMISSION-INDEPENDENCE: if the exact-alarm special access is revoked
+        // (or, in principle, every permission is switched off) the passive arm
+        // above only lands as an INEXACT trigger and could fire late while the
+        // panel stays on. In that case back it with the in-process single-shot
+        // timer at the SAME deadline, so the lock still fires on time. When exact
+        // alarms ARE available we keep the pure zero-Handler path.
+        if (exactAlarmsAvailable()) clearFallbackTimer();
+        else armFallbackTimer(now + rem);
     }
 
     private void cancelTick() {
+        clearFallbackTimer();
         EnforcerReceiver.cancelLimit(this);
         // Drop the coalescing target as well: the next arm must not be mistaken
         // for a redundant re-arm of a trigger that no longer exists.

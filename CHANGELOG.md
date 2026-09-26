@@ -2,6 +2,20 @@
 
 Notable changes to Screen Time Locker, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and [Semantic Versioning](https://semver.org/).
 
+## 6.9 - 2026-09-26
+
+### Added
+- **Permanent app-control strip** (`Engine.applyHardening`). Once every permission — Device Admin included — is approved and the commitment is activated, the Device Owner also sets `UserManager.DISALLOW_APPS_CONTROL`. This removes the whole app-management surface (`Settings > Apps`, including every per-app **Permissions** and **Special app access** page) for the entire device, so after activation **no permission can be enabled or disabled for any app**, and no app can be uninstalled, force-stopped or have its data cleared. It is deliberately device-wide — this is a single-purpose commitment/kiosk device — and it is cleared again only when the commitment itself is torn down (`enable == false`). Combined with the package-scoped `setPermissionGrantState(GRANTED)` pin (which already greys out this app's own toggles) it is the hard "permissions cannot be changed afterwards" guarantee.
+- **Permission-independent boundary timer** (`TimeLockService`). The engine's primary trigger is a passive exact alarm, but `SCHEDULE_EXACT_ALARM` is a user-revocable *Special app access* toggle and `USE_FULL_SCREEN_INTENT` likewise. When that access is absent the exact arm degrades to an inexact one and the lock boundary could fire late while the panel stays on. The service (already a foreground service, so its main looper is precise while the screen is on) now arms ONE in-process single-shot timer at the SAME deadline whenever `AlarmManager.canScheduleExactAlarms()` is false. It is posted only while the panel is interactive and cleared on screen-off, lock and destroy, so the normal (permitted) path keeps the zero-Handler idle-power model unchanged. Result: the lock still engages **instantaneously even when the exact-alarm permission has been revoked** (and, in principle, all of them).
+
+### Changed
+- `build.sh` gained optional per-variant version identity: `VERSION_NAME` / `VERSION_CODE` are passed through to `aapt2 link --replace-version`, so one source tree ships both the private-key **release** build and the public-test-key **GitHub** build with distinct version identities. `OUT_NAME` (already supported) names the output.
+
+### Notes
+- **Release build** is version **6.9** (versionCode 30), signed with the maintainer private release key.
+- **GitHub build** (`timelock-locker-github.apk`) is version **6.3.3** (versionCode 23), signed with the bundled public test key.
+- No new wake lock, thread or alarm was added: the boundary fallback is a single `Handler` callback that lives only while the screen is on and only when exact alarms are unavailable.
+
 ## 6.3.6 - 2026-09-26
 
 ### Fixed

@@ -44,6 +44,18 @@ WORK="$ROOT/.build"
 MIN_API=26
 TARGET_API=34
 OUT_NAME="${OUT_NAME:-timelock-locker.apk}"
+# Optional per-variant version override. The manifest carries a default
+# versionCode/versionName; when either is supplied here aapt2 rewrites them at
+# link time (--replace-version), so one source tree can ship a release build and
+# a public/test build with different version identities.
+VERSION_NAME="${VERSION_NAME:-}"
+VERSION_CODE="${VERSION_CODE:-}"
+VER_OVERRIDE=()
+if [ -n "$VERSION_NAME" ] || [ -n "$VERSION_CODE" ]; then
+  VER_OVERRIDE+=(--replace-version)
+  [ -n "$VERSION_CODE" ] && VER_OVERRIDE+=(--version-code "$VERSION_CODE")
+  [ -n "$VERSION_NAME" ] && VER_OVERRIDE+=(--version-name "$VERSION_NAME")
+fi
 
 say() { printf '\033[1;36m==> %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -173,6 +185,7 @@ say "[2/7] aapt2 link"
   --min-sdk-version "$MIN_API" \
   --target-sdk-version "$TARGET_API" \
   --auto-add-overlay \
+  ${VER_OVERRIDE[@]+"${VER_OVERRIDE[@]}"} \
   "$WORK/res.zip"
 
 # ---- [3/7] Java -------------------------------------------------------------
