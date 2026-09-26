@@ -4,6 +4,11 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import java.util.Calendar;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Durable state store. Every mutating write uses commit() (synchronous, fsync'd)
@@ -160,6 +165,26 @@ final class Prefs {
     }
     static int powerDataPrior(Context c) { return sp(c).getInt("power_data_prior", -1); }
     static int powerWifiPrior(Context c) { return sp(c).getInt("power_wifi_prior", -1); }
+
+    /**
+     * The exact set of packages the lock suspended via
+     * (DevicePolicyManager#setPackagesSuspended). Recorded so the unlock
+     * un-suspends precisely what the lock suspended — and nothing else.
+     */
+    static Set<String> powerSuspended(Context c) {
+        Set<String> s = sp(c).getStringSet("power_suspended", null);
+        return s == null ? Collections.<String>emptySet() : new HashSet<>(s);
+    }
+
+    static void setPowerSuspended(Context c, Collection<String> pkgs) {
+        SharedPreferences.Editor e = sp(c).edit();
+        if (pkgs == null || pkgs.isEmpty()) {
+            e.remove("power_suspended");
+        } else {
+            e.putStringSet("power_suspended", new HashSet<>(pkgs));
+        }
+        put(e);
+    }
 
     /**
      * Record one engage/release pass. {@code engaged} is what the unlock path

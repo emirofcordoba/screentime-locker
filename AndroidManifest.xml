@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.vortex.timelock"
-    android:versionCode="33"
-    android:versionName="7.1">
+    android:versionCode="34"
+    android:versionName="7.2">
 
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
 
@@ -16,6 +16,13 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.REORDER_TASKS" />
+
+    <!-- ===================== LOCK POWER POLICY (native Device Owner) =====================
+         BatteryGuard turns Wi-Fi off while the kiosk lock owns the device and restores
+         the owner's prior state on unlock. As Device Owner these calls are honoured even
+         on targetSdk >= 29 (a plain app would be refused). No shell / ADB / Shizuku. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
     <!-- ===================== SHIZUKU CLIENT =====================
          The Shizuku client permission. The Shizuku manager (moe.shizuku.privileged.api)

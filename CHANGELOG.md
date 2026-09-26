@@ -19,6 +19,16 @@ Notable changes to Screen Time Locker, following [Keep a Changelog](https://keep
 - The kiosk changes above touch only `KioskContainer`, `KioskDashboard` and `LockActivity`; no manifest, build script or version identity changed, and the app still builds to the same package.
 - The following documentation entries are from the earlier documentation-only pass.
 
+## 7.2 - 2026-09-26
+
+### Changed
+- **Lock-mode power policy is now fully native (`BatteryGuard`) — no ADB, no Shizuku.** The moment the kiosk lock engages, the app quiets the rest of the phone using only the Device-Owner `DevicePolicyManager` API instead of the privileged Shizuku shell. It calls `setPackagesSuspended` on every third-party package, which force-stops each one **and keeps it from restarting** (no broadcast, alarm, sync or service restart) until unlock — strictly stronger than the old one-shot `am kill-all`. The foreground kiosk (this app) and every system package are left untouched. Wi-Fi is switched off through the Device-Owner-exempt `WifiManager.setWifiEnabled`, and the exact pre-lock state (Wi-Fi on/off and the precise set of suspended packages) is stored, so unlock restores precisely what the owner had and never turns on a radio that was already off.
+- **`setPackagesSuspended` is gated at API 24, not API 30.** The bulk suspend call has existed since Android 7.0; gating it at API 30 would have silently disabled app-killing on Android 8–10 even though the API is present there. It now works on every supported device (`minSdkVersion` 26).
+
+### Notes
+- **Mobile data cannot be toggled by a Device Owner on stock Android.** `mobile_data` is not in the `setGlobalSetting` allow-list and `TelephonyManager.setDataEnabled` needs `MODIFY_PHONE_STATE` (system-only). The policy therefore leaves the cellular radio exactly as the owner set it; suspending every user app means no third-party app can use mobile data either, which is the same practical outcome for everything the kiosk can reach.
+- The manifest gains `ACCESS_WIFI_STATE` / `CHANGE_WIFI_STATE` for the native Wi-Fi toggle; Shizuku is still used only for the one-time Device-Owner provisioning and the optional shell-level hardening, never for the lock-mode power policy.
+
 ## 7.1 - 2026-09-26
 
 ### Added
