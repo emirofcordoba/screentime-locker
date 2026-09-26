@@ -172,6 +172,18 @@ public class GatekeeperActivity extends Activity {
             pendingAutostart = false;
             PermissionFlow.markAutostartAttested(this);
         }
+        // PERMISSION PERMANENCE: the one capability Android gives NO Device-Owner
+        // pin for is the battery-optimization exemption. If it was dropped while we
+        // were away, re-request it here - this is a foreground surface, which is the
+        // only context Android 29+ allows to start that dialog. Owner-gated, gated on
+        // a completed setup and rate-limited, so it never fights the onboarding
+        // STEP_BATTERY row and never stacks dialogs.
+        Engine.reassertBatteryIfLost(this);
+        // PERMISSION PERMANENCE: likewise re-pin every declared runtime permission
+        // (notification included) to its non-revocable GRANTED state on every
+        // resume. DPM-policy only: no storage, no thread, no wake lock, and a free
+        // no-op unless we are the Device Owner.
+        Engine.reassertRuntimePins(this);
         ShizukuBridge.addPermissionListener(permListener);
         ShizukuBridge.addBinderListener(binderListener);
         refreshGate();

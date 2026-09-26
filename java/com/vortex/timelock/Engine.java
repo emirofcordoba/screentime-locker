@@ -1,5 +1,6 @@
 package com.vortex.timelock;
 
+import android.app.Activity;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
@@ -9,8 +10,10 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PermissionInfo;
 import android.content.pm.ResolveInfo;
+import android.net.Uri;
 import android.os.Build;
 import android.os.UserManager;
+import android.provider.Settings;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -137,13 +140,32 @@ final class Engine {
     }
 
     /**
-     * The screen-time limit that applies on the weekday containing [nowMs].
-     *   - a per-day override of 0 disables the lock for that day entirely;
+     * Weekday index of the accounting window that contains [nowMs].
+     *
+     * The 24h window is ANCHORED at the reset time (e.g. 08:35), so the window
+     * running at 00:09 on Saturday is still FRIDAY's window (Fri 08:35 -> Sat
+     * 08:35). The per-weekday schedule must therefore be keyed on the weekday the
+     * window STARTED on, never on the weekday of the raw wall clock: keying on
+     * "now" ended an off day at MIDNIGHT instead of at the next reset, so the
+     * owner got locked out in the small hours of the day after an off day.
+     */
+    static int windowDow(Context c, long nowMs) {
+        return dayOfWeek(windowStartFor(nowMs, Prefs.anchorMin(c)));
+    }
+
+    /**
+     * The screen-time limit that applies to the accounting window containing
+     * [nowMs].
+     *   - a per-day override of 0 disables the lock for that window entirely;
      *   - a positive per-day override wins over the default;
      *   - otherwise the default daily limit applies.
+     *
+     * The day is taken from the window START ({@link #windowDow}), not from the
+     * raw wall clock, so an off day stays off until the next reset time and a
+     * limited day only begins counting at its own reset time.
      */
     static long limitMsFor(Context c, long nowMs) {
-        long day = Prefs.dayLimitMs(c, dayOfWeek(nowMs));
+        long day = Prefs.dayLimitMs(c, windowDow(c, nowMs));
         if (day == 0L) return 0L;                  // explicitly disabled that day
         if (day > 0L) return day;                  // custom limit that day
         return Prefs.limitMs(c);                   // inherit the daily default
@@ -194,6 +216,10 @@ final class Engine {
         // package under Device-Owner control protection. Owner-gated internally,
         // so this is a harmless no-op unless we really own the device.
         applyPermissionLockdown(c, true);
+        // Last mile: install the two states the DPM layer cannot (battery-optimization
+        // exemption + background/autostart allow-list) over the privileged shell,
+        // best-effort and throttled. Owner/admin gated, async and wakelock-free.
+        ShizukuHardener.hardenAsync(c);
         if (!Prefs.activated(c) && !isDeviceOwner(c)) return;
         Intent i = new Intent(c, TimeLockService.class);
         i.setAction(TimeLockService.ACTION_RECHECK);
@@ -454,11 +480,14 @@ final class Engine {
             catch (Throwable t) { Log.w(TAG, "app_standby", t); }
         }
 
-        // Permissions follow the same "activated" lifecycle: while active every
-        // runtime permission we declare is pinned to a non-revocable GRANTED
-        // state and the package is placed under user-control protection, so the
-        // user can never take a permission away again. Released when disabled.
-        applyPermissionLockdown(c, enable);
+        // PERMISSION PERMANENCE (sticky). The moment we are the real Device
+        // Owner every runtime permission this app declares is pinned to a fixed,
+        // non-revocable GRANTED state and the package is placed under user-control
+        // protection. This deliberately no longer follows the "activated" flag:
+        // the whole guarantee is that a permission, once granted, can never be
+        // taken away again, so it is re-asserted on every hardening pass. The call
+        // is owner-gated internally, so it is a harmless no-op without ownership.
+        enforcePermissionPermanence(c);
     }
 
     private static void restrict(DevicePolicyManager d, ComponentName admin, String key, boolean on) {
@@ -850,6 +879,202 @@ final class Engine {
             } catch (Throwable t) { Log.w(TAG, "setUserControlDisabledPackages", t); }
         }
         Log.i(TAG, "permission lockdown " + (enable ? "on" : "off"));
+    }
+
+    /**
+     * SELF LOCK-DOWN - make the DEVICE-OWNER APP ITSELF unmodifiable by the
+     * user the INSTANT ownership lands (the "Activate" tap at the end of the
+     * permission / onboarding page), without waiting for the full setup to
+     * finish.
+     *
+     * <p>This is the "disable app control for this specific app" guarantee. For
+     * our own package it pins every control a user could otherwise reach:
+     *
+     * <ul>
+     *   <li><b>Permissions.</b> Every runtime permission we declare is set to a
+     *       fixed, non-user-manageable GRANTED state via
+     *       {@link #applyPermissionLockdown}. Settings renders the toggle
+     *       greyed-out ("Policy fixed") and the user cannot turn it off.</li>
+     *   <li><b>Force-stop / clear-data / uninstall.</b>
+     *       {@link DevicePolicyManager#setUserControlDisabledPackages} (API 30+)
+     *       turns off user control of our own package, so the App-info buttons
+     *       for force-stop and clear-data are disabled; the explicit call below
+     *       makes the intent unmistakable and idempotent.
+     *       {@link DevicePolicyManager#setUninstallBlocked} is re-asserted as
+     *       API&lt;30 insurance.</li>
+     *   <li><b>Full permanence.</b> The sticky pass in
+     *       {@link #enforcePermissionPermanence} also forces the App-Standby flag
+     *       off and hands off to {@link ShizukuHardener} for the special-access
+     *       app-ops and the Doze exemption that DPM cannot pin.</li>
+     * </ul>
+     *
+     * <p>Owner-gated, idempotent and fully fail-safe: a no-op on a device where
+     * this app is not the Device Owner, and every call is individually wrapped
+     * so a revoked binder or RemoteException degrades to a log line, never a
+     * crash.
+     */
+    static void lockDownSelf(Context c) {
+        if (c == null || !isDeviceOwner(c)) return;
+        DevicePolicyManager d = dpm(c);
+        if (d == null) return;
+        ComponentName admin = TimeLockAdmin.component(c);
+
+        // 1. Pin every declared runtime permission to a fixed, non-user-manageable
+        //    GRANTED state -> the Settings permission toggles go grey.
+        applyPermissionLockdown(c, true);
+
+        // 2. Turn OFF user control of our own package: no force-stop, no
+        //    clear-data, no uninstall from Settings / launcher.
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                d.setUserControlDisabledPackages(admin,
+                        java.util.Collections.singletonList(c.getPackageName()));
+            } catch (Throwable t) { Log.w(TAG, "lockDownSelf userControl", t); }
+        }
+        try { d.setUninstallBlocked(admin, c.getPackageName(), true); }
+        catch (Throwable t) { Log.w(TAG, "lockDownSelf uninstall", t); }
+
+        // 3. The full sticky permanence pass (App-Standby off + shell appops +
+        //    Doze battery exemption). Idempotent with the calls above.
+        enforcePermissionPermanence(c);
+
+        Log.i(TAG, "self lock-down owner=yes");
+    }
+
+    /**
+     * PERMISSION PERMANENCE - the sticky "once granted, never ungrantable" layer.
+     *
+     * <p>Device-Owner only. Idempotent, cheap and fully fail-safe, so it is safe to
+     * call from any component on any event (boot, the periodic work routine, a
+     * power-state change, every service re-check).
+     *
+     * <ol>
+     *   <li><b>Runtime permissions (notification included).</b> Re-pins every
+     *       runtime permission this app declares to a fixed GRANTED state via
+     *       {@link #applyPermissionLockdown}. A permission granted by policy is
+     *       NOT user-manageable: Settings shows the toggle greyed-out and the user
+     *       cannot turn it off. This is what makes {@code POST_NOTIFICATIONS} - and
+     *       any future runtime permission the app requests - permanent the moment
+     *       it is granted.</li>
+     *   <li><b>Uninstall / force-stop / clear-data.</b>
+     *       {@link DevicePolicyManager#setUserControlDisabledPackages} (API 30+)
+     *       already protects the package; {@link DevicePolicyManager#setUninstallBlocked}
+     *       is re-asserted as API&lt;30 insurance. A user-control-disabled package is
+     *       also exempt from App-Standby buckets.</li>
+     *   <li><b>Battery bucket.</b> The device-wide {@code app_standby_enabled} flag
+     *       is forced off so the engine is never bucketed.</li>
+     *   <li><b>Battery exemption + autostart (shell).</b> {@link ShizukuHardener}
+     *       writes the persisted {@code deviceidle} whitelist entry, the
+     *       background-run app-ops and an active standby bucket, and re-grants
+     *       every declared runtime permission over the privileged shell. This is
+     *       the layer that makes the exemption and the OEM autostart switch
+     *       non-revocable; it is async, throttled and wakelock-free.</li>
+     * </ol>
+     *
+     * <p><b>The two states DPM cannot pin</b> - the Doze battery-optimization
+     * <i>exemption</i> and the background / OEM-"autostart" allow-list - are
+     * installed at the SHELL level by {@link ShizukuHardener} (setting 4 below),
+     * which writes the framework's persisted {@code deviceidle.xml} whitelist and
+     * the AOSP background-run app-ops over the bundled Shizuku channel. Those
+     * states are held by the SYSTEM, so once written they survive a reboot, an
+     * app update and a Settings visit. While Shizuku is unavailable the exemption
+     * is still re-asserted as a live state check and re-requested from the
+     * foreground by {@link #reassertBatteryIfLost(Activity)} the instant it is
+     * lost, so the guarantee degrades gracefully rather than disappearing.
+     *
+     * @return true when the package is currently battery-optimization exempt.
+     */
+    static boolean enforcePermissionPermanence(Context c) {
+        if (c == null || !isDeviceOwner(c)) return false;
+        DevicePolicyManager d = dpm(c);
+        if (d == null) return false;
+        ComponentName admin = TimeLockAdmin.component(c);
+
+        // 1. Pin every declared runtime permission (notification included) to a
+        //    fixed, non-user-manageable GRANTED state.
+        applyPermissionLockdown(c, true);
+
+        // 2. Belt-and-braces uninstall block (covers API < 30 where
+        //    setUserControlDisabledPackages does not exist).
+        try { d.setUninstallBlocked(admin, c.getPackageName(), true); }
+        catch (Throwable t) { Log.w(TAG, "setUninstallBlocked", t); }
+
+        // 3. Never let the engine be bucketed into App Standby.
+        try { d.setGlobalSetting(admin, "app_standby_enabled", "0"); }
+        catch (Throwable t) { Log.w(TAG, "app_standby", t); }
+
+        boolean exempt = PermissionFlow.isBatteryExempt(c);
+
+        // 4. Last mile: pin the Doze battery-optimization exemption and the
+        //    background / OEM-autostart allow-list over the privileged shell.
+        //    Throttled, async, owner/admin gated and free when Shizuku is absent.
+        ShizukuHardener.hardenAsync(c);
+
+        Prefs.setLastEvent(c, "perma:lockdown owner=yes battery="
+                + (exempt ? "exempt" : "optimized"));
+        return exempt;
+    }
+
+    /**
+     * FOREGROUND-SAFE runtime-pin re-assert - closes the short window between a
+     * permission being granted and the next boot / power-state / job pass.
+     *
+     * <p>{@link #applyPermissionLockdown} is DPM-policy only: it pins every
+     * declared runtime permission (notification included) back to the fixed
+     * non-revocable GRANTED state, keeps the package under
+     * {@code setUserControlDisabledPackages} protection and touches NO storage,
+     * starts NO thread and takes NO wake lock. So it is free to call from a
+     * foreground {@code onResume()} even on a surface that is contractually
+     * read-only with respect to preferences (see StatusActivity).
+     *
+     * <p>Owner-gated inside {@link #applyPermissionLockdown}, so on a device where
+     * this app is not the Device Owner it is a single boolean check and return.
+     */
+    static void reassertRuntimePins(Context c) {
+        if (c == null || !isDeviceOwner(c)) return;
+        applyPermissionLockdown(c, true);
+    }
+
+    /** Minimum spacing between foreground battery re-request dialogs (ms). */
+    private static final long BATTERY_REASSERT_COOLDOWN_MS = 45000L;
+    /** elapsedRealtime() of the last foreground battery re-request; 0 = none yet. */
+    private static long sBatteryReassertAt = 0L;
+
+    /**
+     * Restore the battery-optimization exemption if the user (or the system) turned
+     * it back on. MUST be driven from a foreground Activity: Android 29+ blocks a
+     * background app from starting the request dialog. Owner-gated and a strict
+     * no-op while the exemption is still in force, so it is free to call on every
+     * {@code onResume()}.
+     */
+    static void reassertBatteryIfLost(Activity a) {
+        if (a == null || !isDeviceOwner(a)) return;
+        if (PermissionFlow.isBatteryExempt(a)) {
+            // Exemption is in force again: clear the latch so a future loss is
+            // corrected immediately instead of waiting out the cooldown.
+            sBatteryReassertAt = 0L;
+            return;
+        }
+        // Only police the exemption once a full setup is activated. During
+        // onboarding the gatekeeper's own STEP_BATTERY row owns the request and a
+        // second requester would fight it.
+        if (!Prefs.activated(a)) return;
+        // Foreground surfaces resume repeatedly (and resume again when the system
+        // dialog is dismissed), so never stack request dialogs back to back.
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (sBatteryReassertAt != 0L && now - sBatteryReassertAt < BATTERY_REASSERT_COOLDOWN_MS) {
+            return;
+        }
+        sBatteryReassertAt = now;
+        try {
+            Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:" + a.getPackageName()));
+            a.startActivity(i);
+            Prefs.setLastEvent(a, "perma:battery-reassert");
+            Log.i(TAG, "battery exemption re-requested");
+        } catch (Throwable t) {
+            Log.w(TAG, "reassertBatteryIfLost", t);
+        }
     }
 
     /**

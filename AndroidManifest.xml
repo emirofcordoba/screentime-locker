@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.vortex.timelock"
-    android:versionCode="15"
-    android:versionName="6.3.1">
+    android:versionCode="21"
+    android:versionName="6.3.2">
 
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
 
@@ -108,6 +108,22 @@
             android:name=".NotificationGuardReceiver"
             android:exported="false" />
 
+        <!-- ===================== POWER-STATE WATCHDOG =====================
+             Re-asserts the sticky permission-permanence layer the instant the
+             Doze / Battery-Saver posture changes, so a dropped battery exemption
+             is corrected without waiting for a reboot. Both actions are protected
+             system broadcasts, so the receiver stays exported="false". Its work
+             is owner-gated inside Engine.enforcePermissionPermanence, so it is a
+             no-op on an un-provisioned install. -->
+        <receiver
+            android:name=".PowerStateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.os.action.DEVICE_IDLE_MODE_CHANGED" />
+                <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <!-- ===================== HIDDEN ADMIN ENTRY =====================
              Dial  *#*#84635#*#*  to open the admin console. -->
         <receiver
@@ -141,6 +157,7 @@
             android:name=".LockActivity"
             android:exported="true"
             android:enabled="false"
+            android:directBootAware="true"
             android:launchMode="singleInstance"
             android:excludeFromRecents="true"
             android:taskAffinity=""

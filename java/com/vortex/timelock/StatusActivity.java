@@ -231,12 +231,15 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
     }
 
     /**
-     * The next weekday (1=Sun .. 7=Sat), strictly after today, whose effective
-     * limit is positive \u2014 i.e. the day the lock resumes after an unlocked day.
+     * The next weekday (1=Sun .. 7=Sat), strictly after the CURRENT ACCOUNTING
+     * WINDOW's weekday ({@link Engine#windowDow}), whose effective limit is
+     * positive \u2014 i.e. the day the lock resumes after an unlocked window. Using
+     * the window's weekday (not the raw wall-clock day) is what makes an off day
+     * that is still running past midnight report the correct resume time.
      * Returns 0 when no weekday within the coming week carries a lock.
      */
     private int nextLockedDow(long now) {
-        int today = Engine.dayOfWeek(now);
+        int today = Engine.windowDow(this, now);
         for (int step = 1; step <= 7; step++) {
             int dow = ((today - 1 + step) % 7) + 1;
             if (ScheduleConfig.effectiveLimitMs(this, dow) > 0L) return dow;
@@ -251,10 +254,14 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
     private long nextLockResetMs(long now) {
         int dow = nextLockedDow(now);
         if (dow == 0) return 0L;
-        int steps = ((dow - Engine.dayOfWeek(now)) + 7) % 7;
+        // Count whole days forward from the MIDNIGHT OF THE DAY THE CURRENT
+        // WINDOW STARTED (not from "now"): on an off-day window that is still
+        // running past midnight, the next locked window begins at the next
+        // reset, e.g. Fri-off -> "Until Sat 08:35", never "Sun 08:35".
+        int steps = ((dow - Engine.windowDow(this, now)) + 7) % 7;
         if (steps == 0) steps = 7;
         Calendar cal = Calendar.getInstance();
-        cal.setTimeInMillis(now);
+        cal.setTimeInMillis(Engine.windowStart(this, now));
         cal.set(Calendar.HOUR_OF_DAY, 0);
         cal.set(Calendar.MINUTE, 0);
         cal.set(Calendar.SECOND, 0);

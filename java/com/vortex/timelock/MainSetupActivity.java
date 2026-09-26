@@ -106,6 +106,9 @@ public class MainSetupActivity extends Activity {
     protected void onResume() {
         super.onResume();
         resumed = true;
+        // Locked-in install: as soon as we hold Device Owner, keep the app's own
+        // controls disabled on every resume (permissions pinned, user control off).
+        if (Engine.isDeviceOwner(this)) Engine.lockDownSelf(this);
         verifyPass();
         // Keep polling only while we are still in the transition state.
         if (!revealed) {

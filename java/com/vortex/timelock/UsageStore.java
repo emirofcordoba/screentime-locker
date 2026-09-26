@@ -221,6 +221,56 @@ final class UsageStore {
     }
 
     /**
+     * Close a session that is still marked live at a point where its continuity
+     * CANNOT be trusted: the process was (re)started, or the screen came back on,
+     * without us ever observing the matching {@code ACTION_SCREEN_OFF} (the
+     * process was dead through the dark period, so the broadcast was never
+     * delivered to us).
+     *
+     * <p>The live delta is taken from {@link SystemClock#elapsedRealtime()}, which
+     * keeps advancing through screen-off and deep sleep. Leaving such a session
+     * open would therefore charge the ENTIRE dark gap as screen-on time - the
+     * "screen-on time is counted while the screen is off" bug. Only the monotonic
+     * slice we can actually vouch for, from the session anchor to the last durable
+     * heartbeat, is banked; the session is then cleared so the caller can start a
+     * fresh, honest one. This mirrors the post-reboot recovery: downtime is never
+     * charged, at the cost of at most one heartbeat interval of unverified on-time.
+     *
+     * @return true when a live-but-unverified session was found and closed.
+     */
+    static boolean reconcileDeadSession(Context c, long nowMs) {
+        ensureLoaded(c);
+        long elapsed = SystemClock.elapsedRealtime();
+        synchronized (LOCK) {
+            if (cSession <= 0L) return false;
+            long delta;
+            if (cBoot == bootCount(c) && cSessionElapsed > 0L && cSeenElapsed >= cSessionElapsed) {
+                // Same boot epoch: the heartbeat-anchored monotonic slice is exact
+                // and immune to wall-clock changes.
+                delta = cSeenElapsed - cSessionElapsed;
+            } else {
+                // Boot epoch moved under us: fall back to wall time clipped to the
+                // durable heartbeat (same rule as the post-reboot recovery).
+                delta = wallDeltaForCrashedSession(c, nowMs);
+            }
+            if (delta > 0L) {
+                if (Long.MAX_VALUE - cAcc < delta) cAcc = Long.MAX_VALUE;
+                else cAcc += delta;
+            }
+            if (cAcc > cVerified) cVerified = cAcc;
+            cSession = 0L;
+            cSessionElapsed = 0L;
+            cSeen = nowMs;
+            cSeenElapsed = elapsed;
+            cBoot = bootCount(c);
+            cRev++;
+            commitLocked(c);
+            Log.i(TAG, "closed unverified live session; acc=" + cAcc);
+            return true;
+        }
+    }
+
+    /**
      * Durable heartbeat. Cheap no-op when nothing moved, otherwise a single
      * fsync'd transaction. Bound the possible loss of an abrupt kill to one
      * heartbeat interval.

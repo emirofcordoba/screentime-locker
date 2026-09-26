@@ -121,6 +121,10 @@ public class PermissionActivity extends Activity {
         ShizukuBridge.addPermissionListener(permListener);
         ShizukuBridge.addBinderListener(binderListener);
         refreshAll();
+        // Self lock-down re-assert on every visit: once we hold Device Owner, make
+        // sure the app's own controls stay disabled (permissions pinned, user
+        // control off) even if the operator returned from a Settings detour.
+        Engine.lockDownSelf(this);
         // AUTO-TRANSITION: if every prerequisite from the previous steps (System
         // Permissions + the Shizuku / Device Admin grant) is already verified,
         // move straight to the Main Setup Screen without another tap. When they
@@ -668,10 +672,19 @@ public class PermissionActivity extends Activity {
                 refreshShizuku();
 
                 if (rep.success) {
+                    // INSTANT self lock-down: the moment ownership lands, make
+                    // THIS app unmodifiable by the user -- every declared
+                    // permission pinned to a fixed, non-user-manageable GRANTED
+                    // state and user control of our own package disabled
+                    // (no force-stop / clear-data / uninstall). This is the
+                    // "app control off for the device-owner app" guarantee, and
+                    // it is applied here so it does not wait for the full setup
+                    // to finish.
+                    Engine.lockDownSelf(app);
                     // Success is asserted ONLY when the shell returned exit code 0
                     // for dpm set-device-owner. Toast, then move straight to the
                     // setup screen. No system Settings screen is involved.
-                    toast("Device Owner granted \u2014 continuing to setup\u2026");
+                    toast("Device Owner granted \u2014 app locked, continuing to setup\u2026");
                     openSetup();
                 } else {
                     new AlertDialog.Builder(this)
@@ -692,6 +705,8 @@ public class PermissionActivity extends Activity {
             toast("Please tick the box in step 1 first");
             return;
         }
+        // Locked-in install: pin the app's own controls before leaving this page.
+        if (Engine.isDeviceOwner(this)) Engine.lockDownSelf(this);
         if (!Engine.isDeviceOwner(this) && !Engine.isAdminActive(this)) {
             new AlertDialog.Builder(this)
                     .setTitle("No Device Admin yet")

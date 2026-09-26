@@ -61,6 +61,11 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
     // ---- form fields ----
     private IntervalSelector limitSel, warnSel;
     private EditText ahIn, amIn;
+    /** True when the DEVICE clock preference is 24-hour; the reset picker follows it. */
+    private boolean use24 = true;
+    /** Meridiem for the reset hour when {@link #use24} is false (12-hour devices). */
+    private boolean pm = false;
+    private Button amBtn, pmBtn;
     private TextView limitPreview, resetPreview, warnPreview;
     private WeekdayScheduleCard scheduleCard;
     private TextView schedulePreview;
@@ -129,11 +134,11 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        // capture in-flight edits
+        // Capture in-flight edits as a 24-hour minute-of-day so the anchor survives a
+        // 12/24-hour flip unchanged: the picker is rebuilt below in the new clock form.
         int lim = limitSel != null ? limitSel.getValue() : 0;
         int warn = warnSel != null ? warnSel.getValue() : Prefs.warnSeconds(this);
-        String ah = ahIn != null ? ahIn.getText().toString() : "";
-        String am = amIn != null ? amIn.getText().toString() : "";
+        int anchorNow = resetMinuteOfDay();
 
         ui = new Ui(this).bind(this);
         buildUi();
@@ -142,8 +147,7 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
 
         if (limitSel != null) limitSel.setValue(lim);
         if (warnSel != null) warnSel.setValue(warn);
-        if (ahIn != null && !ah.isEmpty()) ahIn.setText(ah);
-        if (amIn != null && !am.isEmpty()) amIn.setText(am);
+        setResetFields(anchorNow);
         updatePreview();
     }
 
@@ -441,11 +445,17 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
     private void buildResetCard(LinearLayout box) {
         LinearLayout c = card();
         box.addView(c);
+        use24 = TimeFmt.is24(this);
         c.addView(cardTitle("3  \u00b7  Reset time"));
-        c.addView(body("The counter returns to zero at this time every day. Enter the hour on the 24-hour clock; the preview matches your device's time format."));
+        c.addView(body(use24
+                ? "The counter returns to zero at this time every day. Enter the hour on the "
+                  + "24-hour clock; the preview matches your device's time format."
+                : "The counter returns to zero at this time every day. Enter the hour, then "
+                  + "choose AM or PM \u2014 the whole app follows your device's 12-hour clock."));
 
         c.addView(divider());
-        timeRow(c, "Hour", ahIn, 0, 23);
+        timeRow(c, "Hour", ahIn, use24 ? 0 : 1, use24 ? 23 : 12);
+        if (!use24) c.addView(meridiemRow());
         timeRow(c, "Minute", amIn, 0, 59);
         resetPreview = previewLine();
         c.addView(resetPreview);
@@ -607,11 +617,10 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
     // ==================================================================== form state
 
     private void seedFields() {
-        int anchor = Prefs.anchorMin(this);
+        use24 = TimeFmt.is24(this);
         ahIn = numField(2);
-        ahIn.setText(String.format(Locale.US, "%d", anchor / 60));
         amIn = numField(2);
-        amIn.setText(String.format(Locale.US, "%d", anchor % 60));
+        setResetFields(Prefs.anchorMin(this));
     }
 
     private void showGate() {
@@ -652,9 +661,7 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
             }
         }
         if (resetPreview != null) {
-            int ah = clamp(parseInt(ahIn, 0), 0, 23);
-            int am = clamp(parseInt(amIn, 0), 0, 59);
-            resetPreview.setText("Resets every day at  " + clockAt(this, ah * 60 + am));
+            resetPreview.setText("Resets every day at  " + clockAt(this, resetMinuteOfDay()));
             resetPreview.setTextColor(ui.accent);
         }
         if (warnPreview != null && warnSel != null) {
@@ -673,13 +680,13 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
     private boolean applyInputs(boolean activate) {
         if (limitSel == null) return false;
         int mins = clamp(limitSel.getValue(), 0, 1440);
-        int ah = parseInt(ahIn, 0), am = parseInt(amIn, 0);
         long limit = mins * 60_000L;
         if (limit < 60_000L) { toast("Set a limit of at least 1 minute"); return false; }
-        if (ah < 0 || ah > 23 || am < 0 || am > 59) { toast("Bad reset time"); return false; }
 
         Prefs.setLimitMs(this, limit);
-        Prefs.setAnchorMin(this, ah * 60 + am);
+        // resetMinuteOfDay() clamps the hour/minute against the device's clock form,
+        // so a half-typed field can never persist an out-of-range anchor.
+        Prefs.setAnchorMin(this, resetMinuteOfDay());
         Prefs.setWarnSeconds(this, clamp(warnSel == null ? 10 : warnSel.getValue(), 1, 120));
         return true;
     }
@@ -1245,6 +1252,97 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
         int v = clamp(parseInt(f, min) + delta, min, max);
         f.setText(String.format(Locale.US, "%d", v));
         updatePreview();
+    }
+
+    // --------------------------------------------------- reset-time picker
+
+    /**
+     * The reset instant currently dialled into the picker, as a 24-hour
+     * minute-of-day. The two fields are read through the DEVICE's clock form: on a
+     * 12-hour phone {@link #ahIn} holds 1..12 and {@link #pm} supplies the
+     * meridiem; on a 24-hour phone it holds 0..23. Every value is clamped, so a
+     * half-typed field can never yield an out-of-range anchor.
+     */
+    private int resetMinuteOfDay() {
+        if (ahIn == null || amIn == null) return Prefs.anchorMin(this);
+        int h = clamp(parseInt(ahIn, use24 ? 0 : 12), use24 ? 0 : 1, use24 ? 23 : 12);
+        int m = clamp(parseInt(amIn, 0), 0, 59);
+        int h24 = use24 ? (h % 24) : ((h % 12) + (pm ? 12 : 0));
+        return h24 * 60 + m;
+    }
+
+    /**
+     * Seed the hour/minute fields + AM/PM state from a 24-hour minute-of-day,
+     * rendered in whatever clock form the device currently uses. Called at build
+     * time and after a configuration change so the anchor is never lost.
+     */
+    private void setResetFields(int minuteOfDay) {
+        int m = ((minuteOfDay % 1440) + 1440) % 1440;
+        int h24 = m / 60;
+        use24 = TimeFmt.is24(this);
+        pm = h24 >= 12;
+        int shown = use24 ? h24 : (h24 % 12 == 0 ? 12 : h24 % 12);
+        if (ahIn != null) ahIn.setText(String.format(Locale.US, "%d", shown));
+        if (amIn != null) amIn.setText(String.format(Locale.US, "%d", m % 60));
+        paintMeridiem();
+    }
+
+    /** A caption + [AM][PM] segmented toggle, shown only on 12-hour devices. */
+    private View meridiemRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(10);
+        row.setLayoutParams(lp);
+
+        TextView cap = new TextView(this);
+        cap.setText("AM / PM");
+        cap.setTextColor(ui.textDim);
+        cap.setTextSize(15f);
+        cap.setTypeface(Ui.medium());
+        cap.setLayoutParams(new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(cap);
+
+        amBtn = meridiemButton("AM");
+        pmBtn = meridiemButton("PM");
+        LinearLayout.LayoutParams plp = (LinearLayout.LayoutParams) pmBtn.getLayoutParams();
+        plp.leftMargin = dp(10);
+        pmBtn.setLayoutParams(plp);
+        amBtn.setOnClickListener(v -> { pm = false; paintMeridiem(); updatePreview(); });
+        pmBtn.setOnClickListener(v -> { pm = true; paintMeridiem(); updatePreview(); });
+        row.addView(amBtn);
+        row.addView(pmBtn);
+        paintMeridiem();
+        return row;
+    }
+
+    private Button meridiemButton(String label) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setAllCaps(false);
+        b.setTextSize(17f);
+        b.setTypeface(Ui.bold());
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(72), dp(50)));
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(0); b.setMinimumWidth(0);
+        b.setMinHeight(0); b.setMinimumHeight(0);
+        b.setStateListAnimator(null);
+        return b;
+    }
+
+    private void paintMeridiem() {
+        if (amBtn == null || pmBtn == null) return;
+        styleMeridiem(amBtn, !pm);
+        styleMeridiem(pmBtn, pm);
+    }
+
+    private void styleMeridiem(Button b, boolean on) {
+        b.setTextColor(on ? ui.onAccent : ui.text);
+        b.setBackground(ui.rounded(on ? ui.accent : ui.surfaceAlt, 12,
+                on ? 0 : ui.border, 1.5f));
     }
 
     private static int clamp(int v, int lo, int hi) {

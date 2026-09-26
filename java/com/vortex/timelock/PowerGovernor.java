@@ -113,14 +113,17 @@ final class PowerGovernor {
      * maintained entirely from screen broadcasts.
      */
     static void attach(Context c) {
-        boolean on = true;
+        // Conservative default: an unavailable/unreadable PowerManager is treated
+        // as NON-interactive, so the governor never counts/keeps an on-session
+        // alive on an assumption (matching TimeLockService's session gate).
+        boolean on = false;
         try {
             PowerManager pm = c == null ? null
                     : (PowerManager) c.getApplicationContext()
                             .getSystemService(Context.POWER_SERVICE);
-            on = pm == null || pm.isInteractive();
+            on = pm != null && pm.isInteractive();
         } catch (Throwable t) {
-            Log.w(TAG, "attach: assuming interactive", t);
+            Log.w(TAG, "attach: assuming not interactive", t);
         }
         synchronized (PowerGovernor.class) {
             sInteractive = on;

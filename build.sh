@@ -11,12 +11,17 @@
 #
 #  Signing
 #  -------
-#  By default this script signs the APK with a bundled TEST key
-#  (keystore/timelock-test.jks, password "testkey123"). That key exists ONLY so
-#  a fresh clone produces a working, installable build. It is publicly known
-#  and must NEVER be used to ship a real release: anyone can sign an APK with
-#  it. For a real release, generate your own private keystore and point this
-#  script at it with SIGNING_STORE / SIGNING_PASS / SIGNING_ALIAS.
+#  By default this script signs with the project's RELEASE keystore at
+#  /root/keystore/timelock-release.jks (alias "timelock", password read from
+#  /root/keystore/keystore.pass). Override the destination directory with
+#  TIMELOCK_KEYSTORE_DIR, or the store / password / alias directly with
+#  SIGNING_STORE / SIGNING_PASS / SIGNING_ALIAS.
+#
+#  To reproduce the public test build instead, point SIGNING_STORE at the
+#  bundled TEST key and set its alias/password:
+#      SIGNING_STORE=$PWD/keystore/timelock-test.jks \
+#      SIGNING_ALIAS=timelock-test SIGNING_PASS=testkey123 bash build.sh
+#  That test key is publicly known and must NEVER be used to ship a release.
 #
 #  Usage:  bash build.sh
 #
@@ -24,8 +29,9 @@
 #      ANDROID_SDK_ROOT   Android SDK location (auto-detected otherwise)
 #      BUILD_TOOLS        build-tools version dir (e.g. 36.0.0)
 #      KOTLIN_STDLIB      path to kotlin-stdlib.jar (auto-detected otherwise)
+#      TIMELOCK_KEYSTORE_DIR  dir holding the release keystore (default /root/keystore)
 #      SIGNING_STORE      path to your .jks / .keystore
-#      SIGNING_PASS       keystore + key password
+#      SIGNING_PASS       keystore + key password (overrides keystore.pass)
 #      SIGNING_ALIAS      key alias inside the keystore
 #      OUT_NAME           output apk file name (default timelock-locker.apk)
 # =============================================================================
@@ -94,16 +100,47 @@ fi
 [ -n "$KOTLIN_STDLIB" ] && [ -f "$KOTLIN_STDLIB" ] || die "kotlin-stdlib.jar not found. Set KOTLIN_STDLIB."
 
 # ----- signing key -----------------------------------------------------------
-SIGNING_STORE="${SIGNING_STORE:-$ROOT/keystore/timelock-test.jks}"
-SIGNING_PASS="${SIGNING_PASS:-testkey123}"
-SIGNING_ALIAS="${SIGNING_ALIAS:-timelock-test}"
+# Default: the maintainer RELEASE keystore at /root/keystore (RSA-4096,
+# SHA384withRSA, alias "timelock"). Its password is read from the root-only
+# keystore.pass next to it. Override any of SIGNING_STORE / SIGNING_PASS /
+# SIGNING_ALIAS for your own key, or point SIGNING_STORE at the bundled TEST key
+# ($ROOT/keystore/timelock-test.jks, alias timelock-test, pass testkey123) to
+# reproduce the public test build.
+KEYSTORE_DIR="${TIMELOCK_KEYSTORE_DIR:-/root/keystore}"
+SIGNING_STORE="${SIGNING_STORE:-$KEYSTORE_DIR/timelock-release.jks}"
+SIGNING_ALIAS="${SIGNING_ALIAS:-timelock}"
+SIGNING_PASS_FILE=""
+if [ -n "${SIGNING_PASS:-}" ]; then
+  : # an explicit password wins over the on-disk password file
+elif [ -f "$KEYSTORE_DIR/keystore.pass" ]; then
+  SIGNING_PASS_FILE="$KEYSTORE_DIR/keystore.pass"
+  SIGNING_PASS="$(tr -d '\r\n' < "$SIGNING_PASS_FILE")"
+else
+  SIGNING_PASS="testkey123"
+fi
 if [ ! -f "$SIGNING_STORE" ]; then
-  say "No keystore found - generating the bundled TEST key"
-  mkdir -p "$(dirname "$SIGNING_STORE")"
-  keytool -genkeypair -keystore "$SIGNING_STORE" -alias "$SIGNING_ALIAS" \
-    -keyalg RSA -keysize 2048 -validity 10000 -storetype PKCS12 \
-    -storepass "$SIGNING_PASS" -keypass "$SIGNING_PASS" \
-    -dname "CN=Screen Time Locker TEST KEY (DO NOT SHIP), OU=Open Source Test, O=Community, C=US" >/dev/null
+  if [ "$SIGNING_STORE" = "$ROOT/keystore/timelock-test.jks" ]; then
+    say "No TEST keystore found - generating the bundled TEST key"
+    mkdir -p "$(dirname "$SIGNING_STORE")"
+    keytool -genkeypair -keystore "$SIGNING_STORE" -alias "timelock-test" \
+      -keyalg RSA -keysize 2048 -validity 10000 -storetype PKCS12 \
+      -storepass "testkey123" -keypass "testkey123" \
+      -dname "CN=Screen Time Locker TEST KEY (DO NOT SHIP), OU=Open Source Test, O=Community, C=US" >/dev/null
+  else
+    die "Signing keystore not found: $SIGNING_STORE (set SIGNING_STORE or create it)."
+  fi
+fi
+# apksigner reads a `file:` password source line-by-line and consumes one line
+# per request, so the same file cannot serve both --ks-pass and --key-pass
+# (the second read hits EOF). Use the file for the keystore password and the
+# already-extracted literal for the key password; fall back to a literal for
+# both when no password file is in play.
+if [ -n "$SIGNING_PASS_FILE" ]; then
+  KS_PASS_ARG="file:$SIGNING_PASS_FILE"
+  KEY_PASS_ARG="pass:$SIGNING_PASS"
+else
+  KS_PASS_ARG="pass:$SIGNING_PASS"
+  KEY_PASS_ARG="pass:$SIGNING_PASS"
 fi
 
 # ----- bundled third-party classes (Shizuku client + provider) ---------------
@@ -173,8 +210,8 @@ say "[7/7] apksigner"
 "$APKSIGNER" sign \
   --ks "$SIGNING_STORE" \
   --ks-key-alias "$SIGNING_ALIAS" \
-  --ks-pass "pass:$SIGNING_PASS" \
-  --key-pass "pass:$SIGNING_PASS" \
+  --ks-pass "$KS_PASS_ARG" \
+  --key-pass "$KEY_PASS_ARG" \
   --v1-signing-enabled true \
   --v2-signing-enabled true \
   --v3-signing-enabled true \

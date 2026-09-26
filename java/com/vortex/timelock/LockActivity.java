@@ -42,6 +42,19 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
 
     static final String TAG = "TL.Lock";
 
+    /**
+     * Boot-time PRE-UNLOCK launch marker. When set, this activity runs in
+     * DIRECT-BOOT mode: it renders the kiosk from the device-protected mirror
+     * ({@link BootState}) ONLY, because no credential-encrypted storage
+     * ({@link Prefs}, {@link UsageStore}, {@link KioskLogStore}) is readable
+     * before the user unlocks. It never runs a 1 Hz cadence and never touches a
+     * wakelock, so an ongoing lock is on screen from the instant the framework
+     * is up with literally zero idle cost. On USER_UNLOCKED the full engine takes
+     * over (BootReceiver -> Engine.reevaluate -> LockActivity.launch), which
+     * re-delivers this activity as the normal, live lock screen.
+     */
+    static final String EXTRA_PRE_UNLOCK = "tl_pre_unlock";
+
     // Only two colour tokens survive in the activity itself: the window
     // background and the panel fill. Every other colour, and every string the
     // lock screen used to lay out by hand, now belongs to the dashboard module.
@@ -51,6 +64,9 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
     private static WeakReference<LockActivity> sInstance = new WeakReference<>(null);
 
     private boolean lockTaskEntered = false;
+
+    /** True while running the credential-encrypted-storage-free direct-boot path. */
+    private boolean preUnlockMode = false;
 
     // ---- hardened kiosk container + dashboard projection (this revision) ----
     private KioskContainer container;
@@ -77,6 +93,31 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         }
     }
 
+    /**
+     * DIRECT-BOOT entry point: called by {@link BootReceiver} before the user
+     * unlocks, when the device-protected mirror says an activation is in force
+     * and a lock is ongoing. Owner-gated; makes no CE read and needs no runtime
+     * permission.
+     */
+    static void launchPreUnlock(Context c) {
+        if (!Engine.isDeviceOwner(c)) {
+            Log.i(TAG, "pre-unlock launch skipped: not device owner");
+            return;
+        }
+        try {
+            Intent i = new Intent(c, LockActivity.class);
+            i.putExtra(EXTRA_PRE_UNLOCK, true);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+            c.startActivity(i);
+            Log.i(TAG, "pre-unlock kiosk launched");
+        } catch (Throwable t) {
+            Log.e(TAG, "pre-unlock launch failed", t);
+        }
+    }
+
     static void dismiss(Context c) {
         // Only close a live instance. Starting the activity just to have it
         // finish would flash the dark lock screen for a frame.
@@ -89,12 +130,36 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         super.onCreate(savedInstanceState);
         sInstance = new WeakReference<>(this);
 
+        preUnlockMode = getIntent() != null
+                && getIntent().getBooleanExtra(EXTRA_PRE_UNLOCK, false);
+
         long now = System.currentTimeMillis();
         if (!Engine.isDeviceOwner(this)) {
             Log.i(TAG, "not owner -> finishing");
             super.finish();
             return;
         }
+
+        if (preUnlockMode) {
+            // DEVICE-PROTECTED ONLY. Never call Engine.shouldBeLocked / Prefs /
+            // UsageStore / KioskLogStore below the unlock: those live in CE
+            // storage and would throw (the historical boot crash-loop).
+            if (!BootState.activated(this) || !BootState.locked(this)) {
+                super.finish();
+                return;
+            }
+            buildPreUnlockUi();
+            container.attachActivity(this);
+            container.hardenWindow(this, true);
+            container.requestFocus();
+            try { getWindow().setStatusBarColor(Color.BLACK); } catch (Throwable ignored) {}
+            // No WakeGuard (needs Prefs.optScreenOff), no HardwareTick: a static
+            // surface with zero timers is the whole point of the direct-boot path.
+            enforceImmersive();
+            enterLockTaskIfPossible();
+            return;
+        }
+
         if (!Engine.shouldBeLocked(this, now)) {
             super.finish();
             return;
@@ -118,7 +183,32 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (!Engine.isDeviceOwner(this) || !Engine.shouldBeLocked(this, System.currentTimeMillis())) {
+        if (intent != null) setIntent(intent);
+        if (!Engine.isDeviceOwner(this)) { finishSafely(); return; }
+
+        boolean pre = intent != null && intent.getBooleanExtra(EXTRA_PRE_UNLOCK, false);
+        if (pre) {
+            preUnlockMode = true;
+            if (!BootState.activated(this) || !BootState.locked(this)) finishSafely();
+            return;
+        }
+
+        // FULL-ENGINE HANDOVER: a plain (post-unlock) launch has arrived while we
+        // were showing the direct-boot panel, so CE storage is now readable and
+        // the live lock screen must replace the static projection.
+        if (preUnlockMode) {
+            preUnlockMode = false;
+            if (wakeGuard == null) wakeGuard = new WakeGuard(this, this::turnScreenOffGracefully);
+            buildUi();
+            container.hardenWindow(this, true);
+            container.requestFocus();
+            enforceImmersive();
+            enterLockTaskIfPossible();
+            HardwareTick.subscribe(this);
+            Log.i(TAG, "pre-unlock -> full engine handover");
+        }
+
+        if (!Engine.shouldBeLocked(this, System.currentTimeMillis())) {
             finishSafely();
         }
     }
@@ -128,6 +218,18 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         super.onResume();
         sInstance = new WeakReference<>(this);
         if (!Engine.isDeviceOwner(this)) { finishSafely(); return; }
+
+        if (preUnlockMode) {
+            // Direct-boot path: device-protected only, no CE, no cadence.
+            if (!BootState.activated(this) || !BootState.locked(this)) { finishSafely(); return; }
+            enforceImmersive();
+            enterLockTaskIfPossible();
+            if (container != null) {
+                container.applyImmersive();
+                container.requestFocus();
+            }
+            return;
+        }
 
         enforceImmersive();
         enterLockTaskIfPossible();
@@ -177,6 +279,11 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         // Re-assert the kiosk if we are still supposed to be locked. We do NOT
         // relaunch the activity (that used to fight the launcher); lock-task plus
         // the persistent HOME preference bring us back naturally.
+        if (preUnlockMode) {
+            // Device-protected decision only.
+            if (BootState.activated(this) && BootState.locked(this)) enforceImmersive();
+            return;
+        }
         if (Engine.isDeviceOwner(this)
                 && Engine.shouldBeLocked(this, System.currentTimeMillis())) {
             enforceImmersive();
@@ -358,6 +465,49 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
     }
 
     // ======================================================================
+    // DIRECT-BOOT (PRE-UNLOCK) PROJECTION
+    // ======================================================================
+
+    /**
+     * Minimal, timer-free kiosk projection for the direct-boot path. Built
+     * purely from device-protected state: the lock deadline comes from
+     * {@link BootState#lockUntil}, and the wall clock from {@link TimeFmt} (system
+     * settings, readable pre-unlock). No CE read, no tick, no wakelock, no
+     * polling loop -- so the lock costs literally nothing while it waits.
+     */
+    private void buildPreUnlockUi() {
+        container = new KioskContainer(this);
+        container.setBackgroundColor(BG);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER);
+        root.setPadding(dp(24), dp(24), dp(24), dp(24));
+
+        android.widget.TextView title = new android.widget.TextView(this);
+        title.setText("Screen time lock active");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(22f);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title);
+
+        long until = BootState.lockUntil(this);
+        android.widget.TextView sub = new android.widget.TextView(this);
+        sub.setText(until > 0L ? "Unlocks " + formatClock(this, until) : "Locked");
+        sub.setTextColor(Color.parseColor("#9FB0C8"));
+        sub.setTextSize(15f);
+        sub.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(12);
+        root.addView(sub, lp);
+
+        container.addView(root, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(container);
+    }
+
+    // ======================================================================
     // HardwareTick.Sink -- the single authoritative 1 Hz cadence
     // ======================================================================
 
@@ -388,6 +538,9 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
      * of freezing forever.
      */
     private void render(long now) {
+        // The direct-boot panel is deliberately static and never subscribes to the
+        // cadence, but guard anyway so no caller can knock it into a CE read.
+        if (preUnlockMode) return;
         long until = Engine.lockUntilMs(this, now);
         long left = until - now;
 

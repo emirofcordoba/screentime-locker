@@ -121,7 +121,12 @@ public class KioskContainer extends FrameLayout {
             long now = System.currentTimeMillis();
             if (down && now - lastKeyLogMs > 1000L) {
                 lastKeyLogMs = now;
-                Prefs.setLastEvent(getContext(), "kiosk-blocked-key:" + event.getKeyCode());
+                try {
+                    Prefs.setLastEvent(getContext(), "kiosk-blocked-key:" + event.getKeyCode());
+                } catch (Throwable ignored) {
+                    // Pre-unlock (direct boot) the credential-encrypted store is not
+                    // readable yet; a blocked key must never crash the kiosk panel.
+                }
             }
             return true; // consumed before the framework sees it
         }

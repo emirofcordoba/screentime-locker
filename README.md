@@ -10,7 +10,7 @@
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B%20(API%2026%2B)-3DDC84?style=flat-square&logo=android&logoColor=white)](#requirements)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![No Gradle](https://img.shields.io/badge/dependencies-none%20(native%20SDK%20only)-orange?style=flat-square)](#build-from-source)
-[![Signed with](https://img.shields.io/badge/release%20signed%20with-TEST%20KEY-red?style=flat-square)](#the-test-signing-key)
+[![Signed with](https://img.shields.io/badge/release%20signed%20with-private%20key-blue?style=flat-square)](#release-signing)
 [![Latest release](https://img.shields.io/github/v/release/emirofcordoba/screentime-locker?style=flat-square&label=latest%20release)](../../releases)
 
 </div>
@@ -80,7 +80,7 @@ Read the in-app warning before you start. Device Owner is a system-level change,
 4. Launch the app and finish the four-step gatekeeper: autostart, notifications, battery, Device Admin.
 5. Set your daily limit, reset time and warning seconds, then confirm.
 
-The release APK is signed with a public test key so anyone can build and install. See below if you plan to publish your own builds.
+The release APK is signed with the maintainer's private release key. See [Release signing](#release-signing) below, or build your own copy from source and sign it with a key you control.
 
 ## Build from source
 
@@ -130,6 +130,19 @@ screentime-locker/
 ```
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the module map, and [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) explains the engine for people new to Android.
+
+## Release signing
+
+The binaries attached to [Releases](../../releases) are signed with the maintainer's own **private release key**, not the bundled test key. That keystore is kept offline and is never committed to this repository; only its public certificate identity is published:
+
+- Subject: `CN=Sentinel TimeLock, OU=Mobile Security, O=Sentinel, L=NA, ST=NA, C=US`
+- SHA-256: `75:EE:1E:4A:A7:3F:C4:23:CB:93:62:86:74:20:FE:DB:2B:90:2B:7E:C6:08:A2:B9:39:C0:4A:48:48:40:A4:AD`
+
+Because Releases are signed with that key, only the holder of the private keystore can publish an update that Android accepts over an installed release build. Verify any download with:
+
+```bash
+apksigner verify --print-certs timelock-locker.apk
+```
 
 ## The test signing key
 

@@ -9,7 +9,7 @@ Two ways in: install the prebuilt APK, or build it yourself. Both end at the sam
 3. Open the APK and install it.
 4. Launch Screen Time Locker.
 
-The prebuilt APK is signed with the public test key. That is fine for personal use. See the README if you plan to publish your own builds.
+The prebuilt APK is signed with the maintainer's private release key (not the bundled test key). That is fine for personal use. See the README if you plan to publish your own builds.
 
 ## Build it yourself
 

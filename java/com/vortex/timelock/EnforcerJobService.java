@@ -27,6 +27,12 @@ public class EnforcerJobService extends JobService {
             Log.i(TAG, "reconcile from job " + id);
             Engine.selfHeal(this);
             Engine.reevaluate(this, "job:" + id);
+            // PERMISSION PERMANENCE: the periodic work routine is the app's only
+            // unconditional uptime hook, so it re-pins the non-revocable runtime
+            // permission set (notification included), the uninstall block and the
+            // App-Standby exemption on every run. Owner-gated + idempotent: a free
+            // no-op on an un-provisioned install.
+            Engine.enforcePermissionPermanence(this);
         } catch (Throwable t) {
             Log.w(TAG, "job " + id + " failed", t);
         }

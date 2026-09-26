@@ -135,12 +135,15 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
         PowerGovernor.attach(this);
 
         // COMPLETELY IDLE UNTIL CONFIGURED. Until the user has completed setup
-        // (or we are the real Device Owner) we start NO channels, NO foreground
-        // notification, NO screen-event listener and NO timers. onStartCommand()
-        // stops the service immediately in that state, so nothing runs in the
-        // background pre-configuration -- which removes the startup lag and the
-        // interface glitches that happened before ownership was granted.
-        if (!Prefs.activated(this) && !Engine.isDeviceOwner(this)) {
+        // we start NO channels, NO foreground notification, NO screen-event
+        // listener and NO timers. onStartCommand() stops the service immediately
+        // in that state, so nothing runs in the background pre-configuration --
+        // in particular, NO screen-on time is tracked before a schedule exists.
+        // Device ownership alone is NOT enough: it used to be treated as
+        // "configured", which kept an un-activated (never-set-up) install
+        // counting screen-on time and holding a foreground service in the
+        // background for nothing (there is no schedule to enforce yet).
+        if (!Prefs.activated(this)) {
             Log.i(TAG, "created idle (not configured)");
             return;
         }
@@ -159,13 +162,24 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
         liveCountdown.start();
 
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        lastScreenOn = pm == null || pm.isInteractive();
+        // Conservative: an unavailable PowerManager means "unknown", never
+        // "interactive", so we never start counting on an assumption.
+        lastScreenOn = pm != null && pm.isInteractive();
         long bootNow = System.currentTimeMillis();
         // Recover any usage session a reboot/SIGKILL cut short, from the durable
         // heartbeat, before the first lock decision is taken. A no-op unless a
         // session was actually left open across a boot-epoch change.
         if (UsageStore.reconcileAfterRestart(this, bootNow)) {
             Prefs.setLastEvent(this, "usage:session-recovered acc=" + UsageStore.acc(this));
+        }
+        // A session still marked live here means the process (re)started without
+        // ever observing the SCREEN_OFF that ended it - a SIGKILL or OEM kill
+        // delivers no broadcast - so the live monotonic delta would charge the
+        // whole screen-off gap as usage. Close it on the heartbeat-bounded slice
+        // before the first lock decision; a fresh session is started below when
+        // the screen is actually on.
+        if (UsageStore.reconcileDeadSession(this, bootNow)) {
+            Prefs.setLastEvent(this, "usage:stale-session-closed acc=" + UsageStore.acc(this));
         }
         // The screen may already be on when the service starts, in which case we
         // never receive ACTION_SCREEN_ON. Without this the live session badge
@@ -185,9 +199,10 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
             return START_NOT_STICKY;
         }
         Engine.selfHeal(this);
-        // If the app is neither activated nor the device owner there is nothing
-        // to enforce. Do not linger as a foreground service.
-        if (!Prefs.activated(this) && !Engine.isDeviceOwner(this)) {
+        // If the app is not activated there is no schedule, hence nothing to
+        // enforce and nothing worth counting. Do not linger as a foreground
+        // service and do not keep tracking screen-on time in the background.
+        if (!Prefs.activated(this)) {
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -226,7 +241,7 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
         // Only re-arm the self-heal watchdog + platform job while there is still
         // something to enforce; otherwise cancel every alarm/job so the engine
         // stays completely quiet (zero wake locks) until it is configured.
-        if (Prefs.activated(this) || Engine.isDeviceOwner(this)) {
+        if (Prefs.activated(this)) {
             EnforcerReceiver.armWatchdog(this);
             EnforcerScheduler.ensure(this);
         } else {
@@ -270,6 +285,13 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
         lastScreenOn = true;
         long now = System.currentTimeMillis();
         Engine.rollover(this, now);
+        // Rising edge with a still-live session: the matching SCREEN_OFF was never
+        // delivered (the process was dead through the dark period), so the elapsed
+        // delta spans screen-off time. Bank only the heartbeat-bounded slice and
+        // close it, then start a fresh, honest session below.
+        if (UsageStore.reconcileDeadSession(this, now)) {
+            Prefs.setLastEvent(this, "usage:stale-session-closed acc=" + UsageStore.acc(this));
+        }
         UsageStore.startSession(this, now);
         // Feed the transition to the governor BEFORE anything can post. It flips
         // its cached interactivity flag (no PowerManager call), closes the idle
@@ -289,18 +311,21 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
         lastScreenOn = false;
         long now = System.currentTimeMillis();
         long since = Prefs.screenOnSince(this);
-        // Roll the window first, then bank the session delta ONLY when the window
-        // did not roll. (Previously rollover() ran after the delta was added, so
-        // crossing the reset boundary could silently discard the session.)
-        boolean rolled = Engine.rollover(this, now);
-        if (!rolled && since > 0 && now > since) {
-            // Bank the session into the durable counter: one fsync'd transaction,
-            // committed before anything else runs, so a kill right here loses
-            // nothing.
+        // Roll the window FIRST, then bank the live session UNCONDITIONALLY.
+        // rollover() re-anchors a session that straddled the reset boundary to
+        // the new window start, so banking here always records the correct
+        // in-window slice: the whole session when no boundary was crossed, or
+        // only the post-boundary part when one was. The old code called
+        // endSession() on the rolled path, which silently DISCARDED every
+        // post-boundary minute of screen time -- the screen-off undercount this
+        // fixes (screen time was lost whenever the screen went off after the
+        // daily reset boundary).
+        Engine.rollover(this, now);
+        if (since > 0L) {
+            // Fold the live session into the durable counter: one fsync'd
+            // transaction, committed before anything else runs, so a kill right
+            // here loses nothing.
             UsageStore.bankSession(this, now);
-        } else {
-            // Window rolled (counter already reset): just close the session.
-            UsageStore.endSession(this, now);
         }
         cancelTick();
         // Panel off: the governor closes the idle window and parks every
@@ -318,12 +343,12 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
     private void recheck(String reason) {
         long now = System.currentTimeMillis();
 
-        // HARD IDLE GATE: while the app is neither activated nor the owner there
-        // is nothing to enforce and nothing that could enforce it. Cancel every
-        // alarm, clear the countdown and return. This breaks the old
+        // HARD IDLE GATE: while the app is NOT activated there is no schedule,
+        // hence nothing to enforce and nothing that could enforce it. Cancel
+        // every alarm, clear the countdown and return. This breaks the old
         // self-perpetuating loop (recheck -> arm watchdog -> watchdog -> start
         // service -> recheck ...) that kept the device busy before setup.
-        if (!Prefs.activated(this) && !Engine.isDeviceOwner(this)) {
+        if (!Prefs.activated(this)) {
             EnforcerReceiver.cancelAll(this);
             cancelTick();
             PowerGovernor.forgetAll();
@@ -423,11 +448,14 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
     private void scheduleLimitTick() {
         // No user-set limit => nothing to count down to.
         if (Engine.limitMs(this) <= 0L) { cancelTick(); return; }
-        // Nothing to enforce while unconfigured: never arm a trigger at all.
-        if (!Prefs.activated(this) && !Engine.isDeviceOwner(this)) { cancelTick(); return; }
+        // Nothing to enforce while unconfigured: never arm a trigger at all, and
+        // never start a screen-on session (which would count background time).
+        if (!Prefs.activated(this)) { cancelTick(); return; }
 
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        boolean interactive = pm == null || pm.isInteractive();
+        // Conservative: unknown PowerManager == not interactive, so a session is
+        // never started (and background time never counted) on an assumption.
+        boolean interactive = pm != null && pm.isInteractive();
         long now = System.currentTimeMillis();
 
         // Keep the live session badge honest: if the screen is on but no session
@@ -572,7 +600,7 @@ public class TimeLockService extends Service implements LiveCountdown.Sink {
 
     /** Re-post the persistent surface and re-anchor the foreground state. */
     private void reassertForeground() {
-        if (!Prefs.activated(this) && !Engine.isDeviceOwner(this)) return;
+        if (!Prefs.activated(this)) return;
         goForeground();
         // The surface was just (re)posted by goForeground()/startForeground(); drop
         // the render memory so the live countdown re-pushes immediately instead of

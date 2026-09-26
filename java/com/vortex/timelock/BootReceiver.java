@@ -17,7 +17,11 @@ import android.util.Log;
  *     policy calls are made via {@link Engine#reassertKioskSurface}. No CE read,
  *     no activity launch, no runtime permission, and no reliance on an OEM
  *     "autostart" whitelist -> the kiosk surface re-arms itself immediately at
- *     boot and the lock returns on its own once the user unlocks.
+ *     boot. If a lock is ONGOING it is also brought to the screen right away via
+ *     {@link LockActivity#launchPreUnlock}, which renders from the mirror only
+ *     and starts no timer, so the lock activates the instant the framework is up
+ *     (before the passcode) at zero battery cost. The full engine then takes over
+ *     on USER_UNLOCKED.
  *
  *   - POST-UNLOCK (BOOT_COMPLETED / QUICKBOOT_POWERON / MY_PACKAGE_REPLACED /
  *     USER_UNLOCKED once the store is available): the full engine runs, exactly
@@ -70,6 +74,16 @@ public class BootReceiver extends BroadcastReceiver {
             // Recompute window/usage and re-assert or release the lock as needed.
             Engine.reevaluate(context, "boot:" + action);
 
+            // PERMISSION PERMANENCE: re-assert the sticky "once granted, never
+            // ungrantable" layer on EVERY boot, independent of Prefs.activated.
+            // enforcePermissionPermanence is owner-gated and idempotent, so on an
+            // un-provisioned install this is a free no-op; once the app is Device
+            // Owner the runtime pin (notification included), the uninstall block
+            // and the App-Standby exemption are restored before the user reaches a
+            // Settings surface. This runs post-unlock only (guarded above), so it
+            // may touch the credential-encrypted store.
+            Engine.enforcePermissionPermanence(context);
+
             // Re-assert concealment: a reboot must not resurrect the launcher
             // icon or the noisy monitor notification.
             if (Prefs.activated(context)) {
@@ -80,8 +94,9 @@ public class BootReceiver extends BroadcastReceiver {
                 Engine.enforceRecentsBlockade(context, "boot");
                 Engine.silenceNotifications(context);
                 Engine.selfGrantNotifications(context);
-                // Pin the runtime permission set (non-revocable) again on boot.
-                Engine.applyPermissionLockdown(context, true);
+                // (The runtime permission pin is re-asserted unconditionally above by
+                //  Engine.enforcePermissionPermanence, which supersedes the old
+                //  activated-gated applyPermissionLockdown call that used to live here.)
             }
         } catch (Throwable t) {
             Log.e(TAG, "boot handling failed", t);
@@ -102,6 +117,11 @@ public class BootReceiver extends BroadcastReceiver {
             if (activated) {
                 // Owner-gated internally; a no-op when we are not the owner.
                 Engine.reassertKioskSurface(context, locked);
+                // Activate an ONGOING lock IMMEDIATELY, pre-unlock, with no
+                // runtime permission and no CE storage: the kiosk is rendered
+                // from the device-protected mirror alone and runs no cadence, so
+                // it costs literally nothing while it waits for the unlock.
+                if (locked) LockActivity.launchPreUnlock(context);
             }
         } catch (Throwable t) {
             Log.e(TAG, "pre-unlock handling failed", t);
