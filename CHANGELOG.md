@@ -2,6 +2,22 @@
 
 Notable changes to Digital Retreat, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and [Semantic Versioning](https://semver.org/).
 
+## 8.1 - 2026-09-26
+
+### Added
+- **In-kiosk Phone and Messages — calls and SMS without ever leaving the retreat.** The lock screen now carries a three-tab shell (`KioskShell`): the original *Retreat* projection plus a self-contained **Phone** dialer (`DialerScreen`) and **Messages** client (`MessagesScreen`). A person inside the retreat can place an emergency call and read, send or be notified of a text without ever dropping lock task. The platform's system dialer and call screen — both suppressed under lock task — are replaced by the app's own surfaces: `InCallScreen` for ringing / off-hook and `SmsNotice` for a heads-up banner. None of these yield the kiosk, so the lock is never escaped.
+- **Phone line authority (`PhoneLine`).** Collapses the platform phone-state broadcasts into `ringing / off-hook / idle` and drives the in-call overlay; the current number is resolved to a contact name through `ContactNames`, and calls are dialed through `TelecomManager` after `Calls.normalize` trims the input to dialable digits.
+- **In-kiosk messaging.** `.SmsReceiver` (priority 999) delivers live inbound SMS while the retreat owns the screen and pings the in-memory kiosk; `SmsStore` / `CallLogStore` keep the threads and recents, and the Messages dock badge (`KioskShell.setBadge`) stays honest. The receiver never touches credential-encrypted storage before unlock — it only floats a banner and posts a lightweight notification.
+- **Call-aware display-sleep watchdog.** `WakeGuard.suspend()` / `resumeSleep()` hold the panel on for the full duration of a ringing or active call (no sleep alarm is armed while suspended) and re-arm the normal grace window once the line goes idle, so an incoming or outgoing call is never cut off by the lock screen's sleep timer.
+
+### Changed
+- **`LockActivity` hosts the telephony surfaces.** It now implements `KioskShell.Host` and starts / stops the line watcher and SMS listener with the visible session (`startComms` / `stopComms`), re-seeding line state from `getCallState` on resume so a call that arrived while paused is still picked up.
+- **New manifest surface.** Ten DANGEROUS runtime permissions for calls, SMS and contacts (pinned to a fixed `GRANTED` state by `Engine.applyPermissionLockdown()` as Device Owner), a `<queries>` block so dialer / SMS resolution works on Android 11+, and the exported `.SmsReceiver` for the protected `SMS_RECEIVED` broadcast.
+
+### Notes
+- Version identity bumped to `versionCode` 36 / `versionName` 8.1. Release binaries are signed with the maintainer release key.
+- The telephony surfaces run entirely inside the existing kiosk activity; no lock-task escape and no new package or build step.
+
 ## 8.0 - 2026-09-26
 
 ### Changed

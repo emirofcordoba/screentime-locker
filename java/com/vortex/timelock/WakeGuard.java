@@ -53,6 +53,7 @@ final class WakeGuard {
 
     private BroadcastReceiver rx;
     private boolean started = false;
+    private boolean suspended = false;
     private long deadlineMs = 0L;
 
     WakeGuard(Context c, Sink sink) {
@@ -67,7 +68,29 @@ final class WakeGuard {
         return r > 0 ? r : 0L;
     }
 
-    boolean isArmed() { return started && deadlineMs > 0L; }
+    boolean isArmed() { return started && !suspended && deadlineMs > 0L; }
+
+    /**
+     * Suspend the sleep deadline while an interaction must not be interrupted
+     * (e.g. a live or ringing phone call). While suspended no alarm is armed, so
+     * the panel stays on until {@link #resumeSleep()} re-arms a fresh grace
+     * window. Idempotent.
+     */
+    void suspend() {
+        if (suspended) return;
+        suspended = true;
+        deadlineMs = 0L;
+        try { EnforcerReceiver.cancelSleepGuard(ctx); } catch (Throwable ignored) { }
+    }
+
+    /** Resume watching after {@link #suspend()}, re-arming a full grace window. Idempotent. */
+    void resumeSleep() {
+        if (!suspended) return;
+        suspended = false;
+        signal("resume-after-call");
+    }
+
+    boolean isSuspended() { return suspended; }
 
     /** Begin watching for wake signals (idempotent). Arms the deadline immediately. */
     void start() {
@@ -107,7 +130,7 @@ final class WakeGuard {
      * down. No Handler is created or posted.
      */
     void signal(String why) {
-        if (!started) return;
+        if (!started || suspended) return;
         deadlineMs = System.currentTimeMillis() + SLEEP_AFTER_WAKE_MS;
         EnforcerReceiver.armSleepGuard(ctx, deadlineMs);
     }

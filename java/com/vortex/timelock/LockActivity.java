@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -38,7 +39,7 @@ import java.util.Locale;
  * take over the screen. That is what stops this activity from ever fighting the
  * launcher (the old blinking / random-app chaos).
  */
-public class LockActivity extends Activity implements HardwareTick.Sink {
+public class LockActivity extends Activity implements HardwareTick.Sink, KioskShell.Host {
 
     static final String TAG = "TL.Lock";
 
@@ -72,6 +73,39 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
     private KioskContainer container;
     private KioskDashboard dashboard;
     private WakeGuard wakeGuard;
+
+    // ---- calling + SMS inside the kiosk (this revision) ----
+    // The lock screen now carries three tabs: the original projection plus an
+    // in-kiosk Phone and Messages surface. Nothing here ever drops lock task, so
+    // the kiosk is never escaped -- the system dialer/call screen and the SMS
+    // heads-up, both of which the platform suppresses under lock task, are
+    // replaced by this app's own overlays (InCallScreen, SmsNotice).
+    private static final int TAB_RETREAT  = 0;
+    private static final int TAB_PHONE    = 1;
+    private static final int TAB_MESSAGES = 2;
+
+    private KioskShell shell;
+    private FrameLayout retreatPage;
+    private DialerScreen dialer;
+    private MessagesScreen messages;
+    private PhoneLine phoneLine;
+    private InCallScreen inCall;
+    private SmsNotice notice;
+
+    /**
+     * The lock screen's own ear on incoming texts: it floats the heads-up banner
+     * and keeps the Messages dock badge honest. Kept as a field so the exact same
+     * instance is added and removed (a leak-proof identity match) and so
+     * registration stays idempotent across the resume/pause cycle.
+     */
+    private final SmsReceiver.Listener smsListener = new SmsReceiver.Listener() {
+        @Override public void onIncomingSms(final String address, final String body, final long whenMs) {
+            // Broadcast thread -> UI thread; the banner and badge are UI objects.
+            runOnUiThread(new Runnable() {
+                @Override public void run() { onTextArrived(address, body); }
+            });
+        }
+    };
 
     // ---------------------------------------------------------------- lifecycle
 
@@ -257,6 +291,10 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
             container.requestFocus();
         }
 
+        // Bring the in-kiosk telephony surfaces online for this visible session:
+        // watch the line, hear incoming texts, and seed the Messages badge.
+        startComms();
+
         // Join the process's SINGLE authoritative 1 Hz cadence. subscribe()
         // renders immediately, so the projection is populated from the real lock
         // arithmetic on this frame rather than left showing a placeholder until
@@ -271,6 +309,11 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         // attached the handler cancels outright, so a paused lock screen holds no
         // timer at all. The WakeGuard receiver stays registered on purpose: a wake
         // signal while paused still (re)arms the 10-second sleep deadline.
+        // Tear the telephony listeners down while we are not visible; on the
+        // next resume PhoneLine re-seeds from getCallState, so a call that
+        // arrived while we were paused is still picked up (the overlay paints on
+        // resume) rather than missed.
+        if (!preUnlockMode) stopComms();
         HardwareTick.unsubscribe(this);
     }
 
@@ -333,6 +376,7 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
     protected void onDestroy() {
         if (sInstance.get() == this) sInstance = new WeakReference<>(null);
         HardwareTick.unsubscribe(this);
+        stopComms();
         if (wakeGuard != null) wakeGuard.stop();
         exitLockTaskIfNeeded();
         super.onDestroy();
@@ -469,6 +513,22 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         // First kiosk shortcut: the volume rocker drives screen brightness.
         container.setVolumeSink(this::onVolumeStep);
 
+        // The telephony line authority: it collapses the platform's phone-state
+        // broadcasts into "ringing / off-hook / idle" and drives the in-call
+        // overlay. One per activity; while the kiosk is up the system in-call UI
+        // is blocked by lock task, so this overlay IS the call screen.
+        if (phoneLine != null) phoneLine.stop();
+        phoneLine = new PhoneLine(this, this::onLineState);
+
+        // ---- the tab shell: Retreat (dashboard) / Phone / Messages --------
+        shell = new KioskShell(this);
+
+        // Tab 0 RETREAT: the original dashboard, kept verbatim inside its own
+        // page. Its Screen is null -- the host's 1 Hz cadence binds it, not a
+        // show/hide callback.
+        retreatPage = new FrameLayout(this);
+        retreatPage.setBackgroundColor(BG);
+
         // The dashboard replaces the old stack of hand-placed TextViews (icon,
         // title, monospaced terminal matrix, progress bar, percent line, used
         // line, divider, unlock line, footer). All of that is now one module
@@ -490,7 +550,7 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         scroller.setOverScrollMode(View.OVER_SCROLL_NEVER);
         scroller.addView(root, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        container.addView(scroller, new FrameLayout.LayoutParams(
+        retreatPage.addView(scroller, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         LinearLayout card = new LinearLayout(this);
@@ -505,6 +565,38 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         dashboard = new KioskDashboard(this);
         card.addView(dashboard, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        shell.addScreen("\u25C8", "RETREAT", retreatPage, null);
+
+        // Tab 1 PHONE: the dialer (keypad + recents + contact typeahead).
+        dialer = new DialerScreen(this, this);
+        shell.addScreen("\u2706", "PHONE", dialer, dialer);
+
+        // Tab 2 MESSAGES: threads + conversations, with an in-kiosk compose row.
+        messages = new MessagesScreen(this, this);
+        shell.addScreen("\u2709", "MESSAGES", messages, messages);
+        shell.select(TAB_RETREAT);
+        container.addView(shell, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // ---- SMS heads-up banner: added FIRST so the call overlay can sit
+        // above it; also suppressed in code while a call is showing.
+        notice = new SmsNotice(this, new SmsNotice.Tap() {
+            @Override public void onTap(String address, String body) { openThread(address); }
+        });
+        FrameLayout.LayoutParams noticeLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        noticeLp.gravity = Gravity.TOP;
+        container.addView(notice, noticeLp);
+
+        // ---- in-call overlay: TOPMOST, stands in for the blocked system call --
+        inCall = new InCallScreen(this, new InCallScreen.Actions() {
+            @Override public void onAnswer() { if (phoneLine != null) phoneLine.answer(); }
+            @Override public void onDecline() { if (phoneLine != null) phoneLine.end(); }
+            @Override public void onEnd() { if (phoneLine != null) phoneLine.end(); }
+        });
+        container.addView(inCall, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         setContentView(container);
     }
@@ -669,7 +761,7 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         // diffs every string before writing it, so a tick that changes nothing
         // invalidates nothing -- the previous revision set nine TextViews and a
         // ProgressBar unconditionally, every second, forever.
-        if (dashboard != null) {
+        if (dashboard != null && (shell == null || shell.current() == TAB_RETREAT)) {
             dashboard.bind(KioskLogStore.capture(this, now, guard));
         }
         // No self-rescheduling here on purpose: the next tick already exists.
@@ -684,6 +776,105 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
     static String formatClock(Context c, long ms) {
         String day = new SimpleDateFormat("EEE", Locale.US).format(new Date(ms));
         return day + " " + TimeFmt.clock(c, ms);
+    }
+
+    // ======================================================================
+    // Calling + SMS inside the kiosk
+    // ======================================================================
+
+    // ---- KioskShell.Host ----------------------------------------------------
+
+    /**
+     * Originate a call. The number arrives raw from a keypad, a recent row or a
+     * contact; {@link Calls#normalize} trims it to dialable digits and
+     * {@link PhoneLine#place} pushes it onto the radio via TelecomManager. The
+     * system in-call UI cannot surface under lock task, so the overlay paints
+     * instead -- the kiosk is never yielded.
+     */
+    @Override
+    public void placeCall(String number) {
+        String n = Calls.normalize(number);
+        if (TextUtils.isEmpty(n)) return;
+        if (phoneLine != null) phoneLine.place(n);
+    }
+
+    /** Switch to the Messages tab and open the thread for {@code address}. */
+    @Override
+    public void openMessages(String address) {
+        openThread(address);
+    }
+
+    /** Set the Messages dock badge; {@code 0} hides it. */
+    @Override
+    public void setMessagesBadge(int count) {
+        if (shell != null) shell.setBadge(TAB_MESSAGES, count);
+    }
+
+    /** Jump to Messages and open that conversation; empty address = new message. */
+    private void openThread(String address) {
+        String n = Calls.normalize(address);
+        if (shell != null) shell.select(TAB_MESSAGES);
+        if (messages != null) messages.openConversation(n);
+    }
+
+    // ---- line state -> call overlay ----------------------------------------
+
+    /**
+     * PhoneLine listener, invoked on the broadcast thread: hop to the UI thread
+     * and paint the in-call overlay for the new line state.
+     */
+    private void onLineState(final PhoneLine.State state, final String number) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                if (isFinishing() || isDestroyed()) return;
+                if (inCall == null || notice == null) return;
+                String label = ContactNames.label(LockActivity.this, number);
+                if (state == PhoneLine.State.RINGING) {
+                    // A ringing/active call must not be interrupted by the
+                    // display-sleep watchdog: hold the panel on for its duration.
+                    if (wakeGuard != null) wakeGuard.suspend();
+                    notice.hideSmooth();
+                    inCall.showRinging(label);
+                } else if (state == PhoneLine.State.OFFHOOK) {
+                    if (wakeGuard != null) wakeGuard.suspend();
+                    notice.hideSmooth();
+                    inCall.showActive(label);
+                } else {
+                    inCall.hide();
+                    // Call over: re-arm the normal grace window and let the
+                    // panel sleep again exactly as if the user had just walked up.
+                    if (wakeGuard != null && Prefs.optScreenOff(LockActivity.this)) {
+                        wakeGuard.resumeSleep();
+                    }
+                }
+            }
+        });
+    }
+
+    // ---- incoming text -> banner + badge -----------------------------------
+
+    /** UI-thread half of an incoming text: keep the badge honest, float a banner. */
+    private void onTextArrived(String address, String body) {
+        if (isFinishing() || isDestroyed()) return;
+        if (shell != null) shell.setBadge(TAB_MESSAGES, SmsStore.unreadTotal(this));
+        // Never cover the call overlay with a text banner.
+        if (inCall == null || inCall.isShowing() || notice == null) return;
+        notice.show(address, body);
+    }
+
+    // ---- lifecycle ---------------------------------------------------------
+
+    /** Start watching the line and incoming texts; safe to call on every resume. */
+    private void startComms() {
+        if (phoneLine != null) phoneLine.start();
+        SmsReceiver.addListener(smsListener);
+        if (shell != null) shell.setBadge(TAB_MESSAGES, SmsStore.unreadTotal(this));
+    }
+
+    /** Stop watching; safe to call on every pause/destroy. */
+    private void stopComms() {
+        if (phoneLine != null) phoneLine.stop();
+        SmsReceiver.removeListener(smsListener);
     }
 
     private GradientDrawable rounded(int fill, int radiusDp, int strokeColor) {

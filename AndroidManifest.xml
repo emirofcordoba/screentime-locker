@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.vortex.timelock"
-    android:versionCode="35"
-    android:versionName="8.0">
+    android:versionCode="36"
+    android:versionName="8.1">
 
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
 
@@ -16,6 +16,24 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.REORDER_TASKS" />
+
+    <!-- ===================== IN-KIOSK COMMUNICATION (calls + SMS) =====================
+         The lock screen hosts a self-contained dialer and SMS client so a person
+         who is inside the retreat can still make an emergency call and send or
+         read a text. Every one of these is a DANGEROUS (runtime) permission, so
+         Engine.applyPermissionLockdown() pins all of them to a fixed GRANTED
+         state the instant the app is Device Owner, so there is no per-permission
+         prompt inside the kiosk and the user can never revoke them. -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_MMS" />
 
     <!-- ===================== LOCK POWER POLICY (native Device Owner) =====================
          BatteryGuard turns Wi-Fi off while the kiosk lock owns the device and restores
@@ -36,6 +54,28 @@
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
     <!-- Optional: without a sensor/fingerprint the console cannot be unlocked. -->
     <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
+
+    <!-- ===================== PACKAGE VISIBILITY (Android 11+) =====================
+         The dialer resolution and the "open with the system messages app"
+         fallback both need to see the packages that answer these intents. Without
+         this block getDefaultDialerPackage()/resolveActivity() return null on
+         targetSdk 30+ and the kiosk would wrongly believe no phone app exists. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.CALL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="sms" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="smsto" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"
@@ -139,6 +179,21 @@
             <intent-filter>
                 <action android:name="android.provider.Telephony.SECRET_CODE" />
                 <data android:scheme="android_secret_code" android:host="84635" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ===================== IN-KIOSK SMS RECEIVER =====================
+             Live inbound SMS while the retreat owns the screen. The broadcast is
+             delivered to us because we declare RECEIVE_SMS; the receiver never
+             touches CE storage before unlock (it just pings the in-memory kiosk
+             and posts a lightweight notification), so it is safe to run at any
+             time. SMS_RECEIVED is a protected broadcast, so exported="true" here
+             only lets the system deliver it, so no third party can forge it. -->
+        <receiver
+            android:name=".SmsReceiver"
+            android:exported="true">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
 
