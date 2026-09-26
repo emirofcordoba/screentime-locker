@@ -85,9 +85,16 @@ final class KioskLogStore {
         // the dashboard then omits the read-out rather than printing a fake 0%.
         Intent battery = stickyBattery(c);
 
+        // Brightness: two plain Settings.System reads so the lock screen's own
+        // auto toggle and manual slider stay in step with the device, even when
+        // the change was made somewhere else (or survives a reboot).
+        boolean brightnessAuto = Brightness.isAuto(c);
+        int brightnessLevel = Brightness.level(c);
+
         return new KioskSnapshot(nowMs, locked ? left : 0L, used, limit,
                 locked ? unlockAt : 0L, guardSeconds,
-                batteryPercent(battery), batteryCharging(battery), locked, events);
+                batteryPercent(battery), batteryCharging(battery),
+                brightnessAuto, brightnessLevel, locked, events);
     }
 
     /**

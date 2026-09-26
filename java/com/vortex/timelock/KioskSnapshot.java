@@ -34,6 +34,10 @@ final class KioskSnapshot {
     final int batteryPct;
     /** True while the device is charging / plugged in. */
     final boolean charging;
+    /** True while adaptive (auto) brightness is enabled. */
+    final boolean brightnessAuto;
+    /** Stored manual brightness 0..255, or -1 when it is unknown. */
+    final int brightnessLevel;
     /** True while the lock screen is enforced. */
     final boolean locked;
     /** Newest-first history, already humanised by {@link KioskLogParser}. */
@@ -41,6 +45,7 @@ final class KioskSnapshot {
 
     KioskSnapshot(long nowMs, long remainingMs, long usedMs, long limitMs, long unlockAtMs,
                   int guardSeconds, int batteryPct, boolean charging,
+                  boolean brightnessAuto, int brightnessLevel,
                   boolean locked, List<KioskLogEvent> events) {
         this.nowMs = nowMs;
         this.remainingMs = Math.max(0L, remainingMs);
@@ -50,6 +55,8 @@ final class KioskSnapshot {
         this.guardSeconds = guardSeconds;
         this.batteryPct = batteryPct < 0 ? -1 : Math.min(100, batteryPct);
         this.charging = charging;
+        this.brightnessAuto = brightnessAuto;
+        this.brightnessLevel = brightnessLevel < 0 ? -1 : Math.min(Brightness.MAX, brightnessLevel);
         this.locked = locked;
         this.events = events == null ? Collections.<KioskLogEvent>emptyList() : events;
     }

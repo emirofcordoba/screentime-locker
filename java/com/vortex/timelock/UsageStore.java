@@ -76,6 +76,25 @@ final class UsageStore {
     // ---- cache / single source of truth (guarded by LOCK) ----
     private static final Object LOCK = new Object();
     private static boolean loaded = false;
+    /**
+     * TRUE once the row was successfully read (or created) from disk. Until then
+     * the cache holds default values that are NOT authoritative, so nothing may be
+     * written back: see {@link #commitLocked}. A load failure must never be
+     * allowed to overwrite a good row with zeros.
+     */
+    private static boolean loadOk = false;
+    /** Earliest elapsedRealtime() at which a failed load may be retried. */
+    private static long loadRetryAtElapsed = 0L;
+    /** How long to wait before re-attempting a load that threw. */
+    private static final long LOAD_RETRY_MS = 5_000L;
+    /**
+     * Upper bound on the unverified monotonic slice that a same-boot process
+     * restart under a lit panel may be trusted as CONTINUOUS screen-on time.
+     * Safely above the 60 s durability checkpoint, small enough that the rare
+     * "panel went off and on again while the process stayed dead" case can never
+     * over-charge by more than this.
+     */
+    private static final long MAX_UNVERIFIED_CONTINUITY_MS = 5L * 60_000L;
     private static boolean sealEnabled = false;
 
     private static long cWindow = 0L;

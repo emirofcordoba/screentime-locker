@@ -89,6 +89,46 @@
   .tile-cap{font-size:31.5px;font-weight:700;letter-spacing:.08em;color:var(--faint);white-space:nowrap}
   .tile-val{font-size:51px;font-weight:700;color:var(--txt);padding-top:18px}
 
+  /* ---------------- top frame: lock clock + battery pill -------------
+     buildLockClock: a FrameLayout; the clock column fills the width and
+     centres, the battery pill is pinned top|end with 12dp top / 6dp right
+     margins. Battery: 13sp -> 39px mono bold, padding 11/6 dp -> 33/18px,
+     background CARD2, radius 14dp -> 42px, 1dp -> 3px border. */
+  .topframe{position:relative}
+  .battery{
+    position:absolute;top:36px;right:18px;line-height:1;
+    font-family:"DejaVu Sans Mono","Liberation Mono",monospace;
+    font-size:39px;font-weight:700;color:var(--muted);
+    padding:18px 33px;border-radius:42px;
+    background:var(--card2);border:3px solid var(--border);
+  }
+
+  /* ---------------- display brightness (interactive card) -------------
+     buildBrightnessCard: CARD surface, radius 20dp -> 60px, border 1dp ->
+     3px, padding 18/16/18/14 dp -> 54/48/54/42px, top margin 12dp -> 36px.
+     Title 11sp letterSpacing .14 -> 33px ACCENT; value 12sp mono MUTED.
+     Auto row margin-top 14dp -> 42px; label 15sp -> 45px TXT bold; the
+     Switch is off here (manual mode), so the knob is left/faint. */
+  .bright{
+    margin-top:36px;background:var(--card);border:3px solid var(--border);
+    border-radius:60px;padding:48px 54px 42px;
+  }
+  .bright-head{display:flex;align-items:center}
+  .bright-title{flex:1 1 auto;font-size:33px;font-weight:700;letter-spacing:.14em;color:var(--accent)}
+  .bright-val{font-family:"DejaVu Sans Mono","Liberation Mono",monospace;font-size:36px;font-weight:700;color:var(--muted)}
+  .bright-row{display:flex;align-items:center;margin-top:42px}
+  .bright-row .lbl{flex:1 1 auto;font-size:45px;font-weight:700;color:var(--txt)}
+  .switch{position:relative;flex:0 0 132px;width:132px;height:72px;border-radius:42px;
+          background:var(--card2);border:3px solid var(--border)}
+  .switch .knob{position:absolute;top:9px;left:9px;width:48px;height:48px;border-radius:50%;
+                background:var(--faint)}
+  .man-label{font-size:31.5px;font-weight:700;letter-spacing:.08em;color:var(--faint);padding-top:36px}
+  .seek{position:relative;margin-top:12px;height:18px;border-radius:12px;background:var(--card2)}
+  .seek .fill{height:100%;border-radius:12px;background:var(--accent);width:84%}
+  .seek .thumb{position:absolute;top:-12px;left:84%;margin-left:-21px;width:42px;height:42px;
+               border-radius:50%;background:var(--accent);border:3px solid var(--card)}
+  .bright-hint{font-size:34.5px;color:var(--faint);padding-top:12px}
+
   /* ---------------- recent activity ---------------- */
   .activity{
     margin-top:36px;background:var(--card);border:3px solid var(--border);
@@ -115,10 +155,13 @@
 <body>
 <div class="root">
 
-  <!-- ============ lock clock (very top) ============ -->
-  <div class="lockclock">
-    <div class="time">9:41 PM</div>
-    <div class="date">Friday, 25 September</div>
+  <!-- ============ lock clock (very top) + battery pill ============ -->
+  <div class="topframe">
+    <div class="lockclock">
+      <div class="time">9:41 PM</div>
+      <div class="date">Friday, 25 September</div>
+    </div>
+    <div class="battery">&#9889; 82%</div>
   </div>
 
   <!-- ============ header ============ -->
@@ -162,6 +205,24 @@
         <div class="tile-val mono">Now</div>
       </div>
     </div>
+  </div>
+
+  <!-- ============ display brightness (interactive) ============ -->
+  <div class="bright">
+    <div class="bright-head">
+      <div class="bright-title">DISPLAY BRIGHTNESS</div>
+      <div class="bright-val">84%</div>
+    </div>
+    <div class="bright-row">
+      <div class="lbl">Auto brightness</div>
+      <div class="switch"><div class="knob"></div></div>
+    </div>
+    <div class="man-label">MANUAL LEVEL</div>
+    <div class="seek">
+      <div class="fill"></div>
+      <div class="thumb"></div>
+    </div>
+    <div class="bright-hint">Drag to set the level; use the switch for automatic.</div>
   </div>
 
   <!-- ============ activity ============ -->

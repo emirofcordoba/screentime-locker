@@ -58,6 +58,7 @@ The only way in is to wait for the window to end.
 - **Sealed after setup.** Once confirmed, the settings lock themselves and the app hides from your launcher.
 - **Zero-cost idle.** No wake locks and no polling. Timers are passive alarms and the platform's JobScheduler.
 - **Live status-bar countdown.** Seconds remaining, drawn natively by SystemUI.
+- **On-screen brightness control.** The lock screen sets the panel level and adaptive-brightness mode from a slider and switch — device-wide, with no extra permission.
 - **Per-weekday limits.** Give each day its own budget, or switch a day off.
 - **Optional hardening.** Block Safe Mode, block factory reset, disable USB debugging and freeze granted permissions. All off by default.
 - **Light and dark themes** from a single design-token layer.

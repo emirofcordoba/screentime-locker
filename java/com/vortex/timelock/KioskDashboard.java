@@ -12,6 +12,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -133,6 +135,17 @@ final class KioskDashboard extends LinearLayout {
     // ---- battery (top-right corner, lock-screen style) ----
     private TextView batteryText;
 
+    // ---- brightness controls (interactive) ----
+    private Switch autoToggle;
+    private SeekBar brightSeek;
+    private TextView brightValue;
+    /**
+     * True while {@link #renderBrightness} is pushing state into the controls, so
+     * their listeners can tell a programmatic sync from a real user tap and never
+     * echo it back as a settings write.
+     */
+    private boolean syncingBrightness;
+
     // ---- header ----
     private TextView statusPill;
     /** The pill state whose drawable is already installed (see {@link #setPill}). */
@@ -184,6 +197,7 @@ final class KioskDashboard extends LinearLayout {
         addView(buildHeader());
         addView(buildHeroCard());
         addView(buildTileGrid());
+        addView(buildBrightnessCard());
         addView(buildActivityCard());
         addView(buildFooter());
     }
@@ -389,6 +403,135 @@ final class KioskDashboard extends LinearLayout {
         return value;
     }
 
+    /**
+     * Interactive brightness controls: an auto-brightness switch plus a manual
+     * level slider. This is the only part of the dashboard that accepts input, so
+     * it is the only part with listeners — and those listeners run only on a real
+     * user gesture, never on the 1 Hz {@link #bind}.
+     *
+     * <p>Writes go through {@link Brightness}, which uses the Device-Owner
+     * {@code setSystemSetting} path (the lock screen runs only as owner), so the
+     * change needs no permission prompt and takes effect device-wide, including
+     * outside the kiosk once it lifts.
+     */
+    private View buildBrightnessCard() {
+        LinearLayout card = new LinearLayout(getContext());
+        card.setOrientation(VERTICAL);
+        card.setBackground(rounded(CARD, 20, BORDER, 1));
+        card.setPadding(dp(18), dp(16), dp(18), dp(14));
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.topMargin = dp(12);
+        card.setLayoutParams(clp);
+
+        LinearLayout head = new LinearLayout(getContext());
+        head.setOrientation(HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView title = text("DISPLAY BRIGHTNESS", 11, ACCENT, Typeface.BOLD);
+        title.setLetterSpacing(0.14f);
+        title.setLayoutParams(new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        head.addView(title);
+
+        brightValue = text("--", 12, MUTED, Typeface.BOLD);
+        brightValue.setTypeface(Ui.mono(), Typeface.BOLD);
+        brightValue.setGravity(Gravity.RIGHT);
+        head.addView(brightValue);
+        card.addView(head);
+
+        // ---- auto-brightness switch ----
+        LinearLayout autoRow = new LinearLayout(getContext());
+        autoRow.setOrientation(HORIZONTAL);
+        autoRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams arp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        arp.topMargin = dp(14);
+        autoRow.setLayoutParams(arp);
+
+        TextView autoLabel = text("Auto brightness", 15, TXT, Typeface.BOLD);
+        autoLabel.setLayoutParams(new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        autoRow.addView(autoLabel);
+
+        autoToggle = new Switch(getContext());
+        autoToggle.setShowText(false);
+        autoRow.addView(autoToggle);
+        card.addView(autoRow);
+
+        // ---- manual level slider ----
+        TextView manLabel = text("MANUAL LEVEL", 10.5f, FAINT, Typeface.BOLD);
+        manLabel.setLetterSpacing(0.08f);
+        manLabel.setPadding(0, dp(12), 0, 0);
+        card.addView(manLabel);
+
+        brightSeek = new SeekBar(getContext());
+        brightSeek.setMax(Brightness.MAX);
+        brightSeek.setLayoutParams(new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        card.addView(brightSeek);
+
+        TextView hint = text("Drag to set the level; use the switch for automatic.",
+                11.5f, FAINT, Typeface.NORMAL);
+        hint.setPadding(0, dp(2), 0, 0);
+        card.addView(hint);
+
+        // ---- wiring: user gestures only ----
+        autoToggle.setOnCheckedChangeListener((btn, checked) -> {
+            if (syncingBrightness) return;
+            Brightness.setAuto(getContext(), checked);
+            updateBrightnessLabel();
+        });
+
+        brightSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (fromUser) {
+                    // Setting a manual level leaves auto mode by definition; keep
+                    // the switch honest without echoing the change back as a write.
+                    Brightness.setLevel(getContext(), progress);
+                    if (autoToggle.isChecked()) {
+                        syncingBrightness = true;
+                        autoToggle.setChecked(false);
+                        syncingBrightness = false;
+                    }
+                }
+                updateBrightnessLabel();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) { }
+            @Override public void onStopTrackingTouch(SeekBar sb) { }
+        });
+
+        return card;
+    }
+
+    /**
+     * Mirror the live device state into the controls. Guarded so it never fights
+     * the user: while a control is being touched the tick leaves it alone, and a
+     * programmatic change is flagged so the listeners treat it as a sync, not a
+     * tap. Everything is diffed, so a steady brightness performs no work.
+     */
+    private void renderBrightness(KioskSnapshot s) {
+        if (brightSeek == null) return;
+
+        if (!brightSeek.isPressed()
+                && s.brightnessLevel >= 0
+                && brightSeek.getProgress() != s.brightnessLevel) {
+            brightSeek.setProgress(s.brightnessLevel);
+        }
+        if (autoToggle != null && !autoToggle.isPressed()
+                && autoToggle.isChecked() != s.brightnessAuto) {
+            syncingBrightness = true;
+            autoToggle.setChecked(s.brightnessAuto);
+            syncingBrightness = false;
+        }
+        updateBrightnessLabel();
+    }
+
+    /** Paint the right-aligned percentage (or "--" when the level is unknown). */
+    private void updateBrightnessLabel() {
+        if (brightValue == null || brightSeek == null) return;
+        int pct = Brightness.percent(brightSeek.getProgress());
+        setIfChanged(brightValue, pct < 0 ? "--" : pct + "%");
+    }
+
     private View buildActivityCard() {
         LinearLayout card = new LinearLayout(getContext());
         card.setOrientation(VERTICAL);
@@ -534,6 +677,9 @@ final class KioskDashboard extends LinearLayout {
 
         // ---- battery (top-right corner) ----
         renderBattery(s);
+
+        // ---- brightness controls ----
+        renderBrightness(s);
 
         // ---- status pill ----
         if (s.locked) {

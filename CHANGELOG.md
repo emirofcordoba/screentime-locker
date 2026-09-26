@@ -2,6 +2,20 @@
 
 Notable changes to Screen Time Locker, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and [Semantic Versioning](https://semver.org/).
 
+## 7.0 - 2026-09-26
+
+### Added
+- **Interactive display-brightness card on the kiosk lock screen.** The dashboard gains its first input surface: a `DISPLAY BRIGHTNESS` card, sitting between the stat tiles and *Recent activity*, with an **Auto brightness** switch, a **MANUAL LEVEL** slider (`0`-`255`) and a live whole-percent read-out. Writes go through the new `Brightness` helper, which uses the Device-Owner `DevicePolicyManager.setSystemSetting` path - the lock screen only ever runs as the Device Owner - so the panel level and the adaptive-brightness mode are set with **no runtime permission, no `WRITE_SETTINGS` app-op and no Shizuku round-trip**, and the change is device-wide, taking effect outside the kiosk once the lock lifts.
+- The adaptive state and manual level are read on each tick from `Settings.System` and carried on `KioskSnapshot` (`brightnessAuto`, `brightnessLevel`), so the controls stay in step with a change made elsewhere - or one that survives a reboot - instead of showing a stale value.
+
+### Changed
+- `KioskDashboard` gains the only `OnCheckedChangeListener` / `OnSeekBarChangeListener` in the module. They fire **only on a real user gesture**, never on the 1 Hz `bind`: a programmatic mirror is flagged (`syncingBrightness`) so syncing a control to device state is never echoed back as a write, and a control being touched is left alone until the gesture ends. Setting a manual level leaves adaptive mode first (the mode is written before the level), and the switch is corrected without a second write.
+
+### Notes
+- **The zero-wake, zero-battery render contract is unchanged.** The card adds two `Settings.System` reads per tick and no timer, alarm, receiver or wakelock; every rendered value is still diffed before it is written, so a steady brightness performs no invalidation.
+- Reads and writes are defensive: a vendor HAL that refuses the write leaves the panel exactly as it was rather than throwing into the render path, and an unreadable level renders `--` rather than a false `0%`.
+- Version bumped from 6.10 (versionCode 31) to 7.0 (versionCode 32), signed with the maintainer private release key.
+
 ## 6.10 - 2026-09-26
 
 ### Added
