@@ -8,7 +8,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
 
 /**
- * Sentinel TimeLock — single source of design tokens.
+ * Digital Retreat — single source of design tokens.
  *
  * The admin console draws its own surfaces programmatically, so every colour it
  * uses is resolved here. Two balanced palettes are defined and picked from the
@@ -62,59 +62,59 @@ final class Ui {
     Ui(boolean dark) {
         this.dark = dark;
         if (dark) {
-            bg         = Color.parseColor("#0E1420");
-            surface    = Color.parseColor("#171F2E");
-            surfaceAlt = Color.parseColor("#202B3D");
-            field      = Color.parseColor("#0B111B");
-            border     = Color.parseColor("#2C3B52");
+            bg         = Color.parseColor("#121A16");
+            surface    = Color.parseColor("#1B2620");
+            surfaceAlt = Color.parseColor("#24322A");
+            field      = Color.parseColor("#0D1411");
+            border     = Color.parseColor("#33453B");
 
-            text       = Color.parseColor("#F2F6FC");
-            textDim    = Color.parseColor("#A9B6C8");
-            textFaint  = Color.parseColor("#7C8AA0");
+            text       = Color.parseColor("#EEF3EC");
+            textDim    = Color.parseColor("#B4C2B7");
+            textFaint  = Color.parseColor("#86948A");
 
-            accent     = Color.parseColor("#5AC8FA");
-            accentSoft = Color.parseColor("#0A2A3A");
-            onAccent   = Color.parseColor("#04222E");
+            accent     = Color.parseColor("#7FC8A9");
+            accentSoft = Color.parseColor("#123029");
+            onAccent   = Color.parseColor("#0E241C");
 
-            ok         = Color.parseColor("#34D399");
-            okSoft     = Color.parseColor("#08281C");
-            onOk       = Color.parseColor("#04241A");
-            warn       = Color.parseColor("#F5B301");
-            warnSoft   = Color.parseColor("#2E2200");
-            onWarn     = Color.parseColor("#2E2200");
-            danger     = Color.parseColor("#F87171");
-            dangerText = Color.parseColor("#FCA5A5");
-            dangerSoft = Color.parseColor("#2C1315");
-            onDanger   = Color.parseColor("#2A0A0C");
+            ok         = Color.parseColor("#6FBF9B");
+            okSoft     = Color.parseColor("#12281F");
+            onOk       = Color.parseColor("#0E231A");
+            warn       = Color.parseColor("#E0A552");
+            warnSoft   = Color.parseColor("#2E2412");
+            onWarn     = Color.parseColor("#2E2412");
+            danger     = Color.parseColor("#E08573");
+            dangerText = Color.parseColor("#F0B4A2");
+            dangerSoft = Color.parseColor("#2A1613");
+            onDanger   = Color.parseColor("#2A1410");
 
-            track      = Color.parseColor("#26344A");
+            track      = Color.parseColor("#2B3A31");
         } else {
-            bg         = Color.parseColor("#F2F5FA");
+            bg         = Color.parseColor("#F4F1EA");
             surface    = Color.parseColor("#FFFFFF");
-            surfaceAlt = Color.parseColor("#EFF3F9");
+            surfaceAlt = Color.parseColor("#EDE8DE");
             field      = Color.parseColor("#FFFFFF");
-            border     = Color.parseColor("#D3DCE8");
+            border     = Color.parseColor("#DAD3C4");
 
-            text       = Color.parseColor("#10151F");
-            textDim    = Color.parseColor("#51607A");
-            textFaint  = Color.parseColor("#7C8AA0");
+            text       = Color.parseColor("#1E2A24");
+            textDim    = Color.parseColor("#4C5B52");
+            textFaint  = Color.parseColor("#86948A");
 
-            accent     = Color.parseColor("#0B7BD6");
-            accentSoft = Color.parseColor("#E3F0FF");
+            accent     = Color.parseColor("#2F6F5E");
+            accentSoft = Color.parseColor("#E2EFE9");
             onAccent   = Color.parseColor("#FFFFFF");
 
-            ok         = Color.parseColor("#0F8A6A");
-            okSoft     = Color.parseColor("#E1F5EE");
+            ok         = Color.parseColor("#2F7D63");
+            okSoft     = Color.parseColor("#E4F0E9");
             onOk       = Color.parseColor("#FFFFFF");
-            warn       = Color.parseColor("#B7791F");
-            warnSoft   = Color.parseColor("#FDF3DC");
+            warn       = Color.parseColor("#A9762E");
+            warnSoft   = Color.parseColor("#F6EDDB");
             onWarn     = Color.parseColor("#FFFFFF");
-            danger     = Color.parseColor("#D64550");
-            dangerText = Color.parseColor("#C0323D");
-            dangerSoft = Color.parseColor("#FCE8EA");
+            danger     = Color.parseColor("#C0563A");
+            dangerText = Color.parseColor("#A6442C");
+            dangerSoft = Color.parseColor("#F7E3DB");
             onDanger   = Color.parseColor("#FFFFFF");
 
-            track      = Color.parseColor("#DCE4EE");
+            track      = Color.parseColor("#E0DACD");
         }
     }
 

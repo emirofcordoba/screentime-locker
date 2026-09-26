@@ -18,7 +18,7 @@ import java.util.Locale;
 
 /**
  * ============================================================================
- *  Sentinel TimeLock — the always-available status screen
+ *  Digital Retreat — the always-available status screen
  * ============================================================================
  *
  *  <p><b>What this is.</b> The single read-only status page the notifications
@@ -336,7 +336,7 @@ public class StatusActivity extends Activity implements HardwareTick.Sink {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView title = new TextView(this);
-        title.setText("Lock status");
+        title.setText("Retreat status");
         title.setTextColor(ui.text);
         title.setTextSize(24f);
         title.setTypeface(Ui.bold());

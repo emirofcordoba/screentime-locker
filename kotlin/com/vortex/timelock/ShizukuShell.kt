@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * ============================================================================
- *  Screen Time Locker — thread-safe Shizuku transport (Kotlin migration)
+ *  Digital Retreat — thread-safe Shizuku transport (Kotlin migration)
  * ============================================================================
  *
  *  The ONE place the Kotlin UI talks to Shizuku. It wraps the bundled Shizuku

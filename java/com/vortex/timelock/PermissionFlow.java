@@ -14,7 +14,7 @@ import android.provider.Settings;
 
 /**
  * ============================================================================
- *  Screen Time Locker — sequential MANUAL permission ladder (onboarding)
+ *  Digital Retreat — sequential MANUAL permission ladder (onboarding)
  * ============================================================================
  *
  *  This is the single source of truth for the three permission items the

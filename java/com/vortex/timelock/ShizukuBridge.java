@@ -20,7 +20,7 @@ import moe.shizuku.server.IShizukuService;
 import rikka.shizuku.Shizuku;
 
 /**
- * Sentinel TimeLock — Shizuku transport.
+ * Digital Retreat — Shizuku transport.
  *
  * Thin, defensive wrapper over the bundled Shizuku 13.1.5 client (rikka.shizuku.*)
  * and its binder AIDL (moe.shizuku.server.*). It is the ONE place the app talks

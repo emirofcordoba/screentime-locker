@@ -19,7 +19,7 @@ import java.util.List;
 
 /**
  * ============================================================================
- *  Screen Time Locker — clean, framework-only bottom sheet
+ *  Digital Retreat — clean, framework-only bottom sheet
  * ============================================================================
  *
  *  A small, dependency-free bottom sheet used by {@link MainSetupActivity} to

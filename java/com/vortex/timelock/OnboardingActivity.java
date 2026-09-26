@@ -12,7 +12,7 @@ import android.widget.TextView;
 
 /**
  * ============================================================================
- *  Screen Time Locker — initial onboarding (first screen)
+ *  Digital Retreat — initial onboarding (first screen)
  * ============================================================================
  *
  *  Build-ready twin of {@code kotlin/.../OnboardingActivity.kt}. The project is

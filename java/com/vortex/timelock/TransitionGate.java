@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * ============================================================================
- *  Screen Time Locker — readiness gate for the transition to the Main Screen
+ *  Digital Retreat — readiness gate for the transition to the Main Screen
  * ============================================================================
  *
  *  This is the single source of truth for the two prerequisite groups the

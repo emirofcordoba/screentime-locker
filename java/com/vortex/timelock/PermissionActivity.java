@@ -29,7 +29,7 @@ import android.widget.Toast;
 import rikka.shizuku.Shizuku;
 
 /**
- * Sentinel TimeLock — PRE-SETUP PERMISSION ONBOARDING (the very first screen).
+ * Digital Retreat — PRE-SETUP PERMISSION ONBOARDING (the very first screen).
  *
  * <p>This Activity is shown automatically in place of the dashboard until the
  * configuration has been activated (see {@link LauncherDashboard#onCreate}). It
@@ -179,7 +179,7 @@ public class PermissionActivity extends Activity {
         head.setOrientation(LinearLayout.VERTICAL);
 
         TextView kicker = new TextView(this);
-        kicker.setText("BEFORE SETUP");
+        kicker.setText("PREPARE YOUR RETREAT");
         kicker.setTextColor(ui.accent);
         kicker.setTextSize(12.5f);
         kicker.setTypeface(Ui.bold());
@@ -187,7 +187,7 @@ public class PermissionActivity extends Activity {
         head.addView(kicker);
 
         TextView title = new TextView(this);
-        title.setText("Grant each permission");
+        title.setText("Prepare each requirement");
         title.setTextColor(ui.text);
         title.setTextSize(26f);
         title.setTypeface(Ui.bold());

@@ -12,7 +12,7 @@ import java.util.Locale;
  *  TimeFmt — the one place every wall-clock time in the app is formatted
  * ============================================================================
  *
- *  <p><b>Why.</b> Screen Time Locker used to hard-code a clock convention per
+ *  <p><b>Why.</b> Digital Retreat used to hard-code a clock convention per
  *  surface: the kiosk lock clock honoured the user's 12/24-hour setting, but the
  *  launcher + status dashboards always printed {@code HH:mm}, the lock-screen
  *  unlock label always printed {@code h:mm a}, and the setup console always

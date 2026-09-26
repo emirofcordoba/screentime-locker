@@ -1,8 +1,8 @@
 # Architecture
 
-Screen Time Locker is small on purpose. Everything is plain Android framework code — no Gradle and no third-party runtime dependency, apart from the bundled Shizuku client used to grant Device Owner without a PC and to run the optional shell-level hardening.
+Digital Retreat is small on purpose. Everything is plain Android framework code — no Gradle and no third-party runtime dependency, apart from the bundled Shizuku client used to grant Device Owner without a PC and to run the optional shell-level hardening.
 
-Package `com.vortex.timelock`, app label **Screen Time Locker**.
+Package `com.vortex.timelock`, app label **Digital Retreat**.
 
 ## Layers
 

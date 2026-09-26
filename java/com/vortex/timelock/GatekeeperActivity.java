@@ -27,7 +27,7 @@ import rikka.shizuku.Shizuku;
 
 /**
  * ============================================================================
- *  Screen Time Locker — STRICT single-page GATEKEEPER (the one launcher entry)
+ *  Digital Retreat — STRICT single-page GATEKEEPER (the one launcher entry)
  * ============================================================================
  *
  *  A single, self-contained page that gates the whole app. Nothing here is

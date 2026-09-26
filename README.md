@@ -1,8 +1,8 @@
 <div align="center">
 
-# Screen Time Locker
+# Digital Retreat
 
-### A screen-time lock that doesn't negotiate.
+### A digital retreat you can't talk your way out of.
 
 **Hard-enforced. Reboot-proof. Permanent by design.**
 
@@ -15,7 +15,7 @@
 
 </div>
 
-Screen Time Locker counts the time your screen is actually on. Once you spend your daily allowance, it takes the phone over with a real system lock that survives reboots, force-stops and the person holding it. That person is you.
+Digital Retreat turns your phone into a place to step away from. It counts the time your screen is actually on, and once you spend your daily allowance it takes the phone over with a real system sanctuary that survives reboots, force-stops and the person holding it. That person is you.
 
 There is no *unlock anyway* button, no reset code and no PIN. You decide the rule once, on purpose, and Android enforces it after that.
 
@@ -24,15 +24,15 @@ It works by becoming your phone's **Device Owner** — the same role a company I
 ## Screenshots
 
 <p align="center">
-  <img src="assets/gatekeeper.png" alt="The four-step gatekeeper" width="300">
-  <img src="assets/lockscreen.png" alt="The kiosk lock screen" width="300">
+  <img src="assets/gatekeeper.png" alt="Begin the retreat — the four-step setup" width="300">
+  <img src="assets/lockscreen.png" alt="The retreat sanctuary screen" width="300">
 </p>
 
 ## Why it's different
 
 Most screen-time tools are soft. They warn you, dim the screen, count your minutes, then step aside the moment you ask for five more. That comfort is exactly why they fail.
 
-|  | Typical screen-time app | Screen Time Locker |
+|  | Typical screen-time app | Digital Retreat |
 |---|---|---|
 | Enforcement | Reminder banner | Device-Owner kiosk lock |
 | Removable | Any time from Settings | No — settings are sealed once set up |
@@ -138,7 +138,7 @@ screentime-locker/
 
 The binaries attached to [Releases](../../releases) are signed with the maintainer's own **private release key**, not the bundled test key. That keystore is kept offline and is never committed to this repository; only its public certificate identity is published:
 
-- Subject: `CN=Sentinel TimeLock, OU=Mobile Security, O=Sentinel, L=NA, ST=NA, C=US`
+- Subject: `CN=Digital Retreat, OU=Mobile Security, O=Sentinel, L=NA, ST=NA, C=US`
 - SHA-256: `75:EE:1E:4A:A7:3F:C4:23:CB:93:62:86:74:20:FE:DB:2B:90:2B:7E:C6:08:A2:B9:39:C0:4A:48:48:40:A4:AD`
 
 Because Releases are signed with that key, only the holder of the private keystore can publish an update that Android accepts over an installed release build. Verify any download with:
@@ -151,7 +151,7 @@ apksigner verify --print-certs timelock-locker.apk
 
 The repo ships a throwaway key at `keystore/timelock-test.jks` (password `testkey123`, alias `timelock-test`). It exists so a fresh clone builds an installable APK with no setup.
 
-Do not ship with it. The key is public, so anything signed with it can be impersonated — the certificate itself says `CN=Screen Time Locker TEST KEY (DO NOT SHIP)`.
+Do not ship with it. The key is public, so anything signed with it can be impersonated — the certificate itself says `CN=Digital Retreat TEST KEY (DO NOT SHIP)`.
 
 For a real release, make your own key and keep it offline:
 
@@ -190,6 +190,6 @@ Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) fi
 
 <div align="center">
 
-**Set it once. Mean it. Then let the machine hold you to it.**
+**Step away once. Mean it. Then let the machine hold the line.**
 
 </div>

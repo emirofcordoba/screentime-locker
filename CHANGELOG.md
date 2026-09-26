@@ -1,6 +1,15 @@
 # Changelog
 
-Notable changes to Screen Time Locker, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and [Semantic Versioning](https://semver.org/).
+Notable changes to Digital Retreat, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and [Semantic Versioning](https://semver.org/).
+
+## 8.0 - 2026-09-26
+
+### Changed
+- **Digital Retreat restyle — presentation only, no behaviour changes.** The app is now branded and themed as a *Digital Retreat* tool. Every string, colour, style, drawable and launcher icon moved to a calm, nature-toned retreat palette (deep forest surfaces, moss/leaf accent, warm-sun highlights) and the copy throughout the onboarding gate, lock screen and dashboard speaks in retreat language (*Resting — see you soon*, *Prepare your retreat*, *The retreat is in progress*). Layouts, resource names, class names, package id (`com.vortex.timelock`), the Device-Owner provisioning flow and every enforcement path are untouched.
+- **Version identity bumped** to `versionCode` 35 / `versionName` 8.0 to mark the re-skin.
+
+### Notes
+- This release changes only appearance and wording. No logic, permission, manifest component or build step was altered; the app builds to the same package and behaves identically.
 
 ## Unreleased
 
@@ -83,7 +92,7 @@ Notable changes to Screen Time Locker, following [Keep a Changelog](https://keep
 ## 6.3.6 - 2026-09-26
 
 ### Fixed
-- **Screen-time undercount at the daily reset boundary (screen-off data loss).** When the screen went off *after* the window had rolled over, `TimeLockService.onScreenOff()` rolled the window and then called `UsageStore.endSession()`, which silently **discarded** the entire live session - including every post-boundary minute of screen-on time. `Engine.rollover()` already re-anchors a session that straddled the boundary to the new window start, so the correct behaviour is to bank the session unconditionally. `onScreenOff()` now always calls `UsageStore.bankSession()` after `rollover()`, recording the whole session when no boundary was crossed and only the post-boundary slice when one was.
+- **Retreat undercount at the daily reset boundary (screen-off data loss).** When the screen went off *after* the window had rolled over, `TimeLockService.onScreenOff()` rolled the window and then called `UsageStore.endSession()`, which silently **discarded** the entire live session - including every post-boundary minute of screen-on time. `Engine.rollover()` already re-anchors a session that straddled the boundary to the new window start, so the correct behaviour is to bank the session unconditionally. `onScreenOff()` now always calls `UsageStore.bankSession()` after `rollover()`, recording the whole session when no boundary was crossed and only the post-boundary slice when one was.
 - **Background screen-on tracking while un-set-up.** The foreground service, the `ACTION_SCREEN_ON/OFF` receiver and the screen-on session tracker ran whenever the app was *either* activated *or* the device owner (`!Prefs.activated() && !Engine.isDeviceOwner()` gate). A Device-Owner install that had never completed setup therefore kept counting screen-on time in the background with no schedule to enforce. Every tracking/enforcement gate in `TimeLockService` (onCreate, onStartCommand, recheck, scheduleLimitTick, onDestroy, reassertForeground) is now keyed on `Prefs.activated()` alone: no activation => no schedule => nothing to enforce, nothing to count, and the service stays idle.
 
 ### Notes

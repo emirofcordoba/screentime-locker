@@ -23,7 +23,7 @@ import java.util.List;
 
 /**
  * ============================================================================
- *  Screen Time Locker — TRANSITION + MAIN SETUP SCREEN
+ *  Digital Retreat — TRANSITION + MAIN SETUP SCREEN
  * ============================================================================
  *
  *  The screen the operator lands on once the earlier onboarding surfaces have

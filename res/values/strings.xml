@@ -1,40 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Screen Time Locker</string>
+    <string name="app_name">Digital Retreat</string>
 
-    <string name="lock_title">Screen time used up</string>
-    <string name="lock_subtitle">Your screen-time limit for this window is finished. It will unlock automatically.</string>
+    <string name="lock_title">Resting — see you soon</string>
+    <string name="lock_subtitle">Your retreat for this session is complete. The screen will open again automatically.</string>
 
-    <string name="srv_channel">Monitor</string>
-    <string name="srv_title">Screen time monitor</string>
-    <string name="srv_text">Tracking screen-on time</string>
+    <string name="srv_channel">Retreat</string>
+    <string name="srv_title">Digital Retreat guardian</string>
+    <string name="srv_text">Guarding your quiet time</string>
 
     <!-- Live countdown surface: channel name + the label that SystemUI prefixes
          to its own per-second chronometer redraw. -->
     <string name="srv_countdown">Countdown</string>
-    <string name="srv_countdown_text">Screen time remaining</string>
+    <string name="srv_countdown_text">Retreat time remaining</string>
 
-    <string name="notif_not_owner_t">Screen-time limit reached</string>
-    <string name="notif_not_owner_x">Grant Device Owner so the app can enforce the lock screen.</string>
+    <string name="notif_not_owner_t">Retreat limit reached</string>
+    <string name="notif_not_owner_x">Grant Device Owner so the retreat can hold the screen.</string>
 
     <!-- Countdown surface states. The remaining-time line is NEVER rendered as a
          bare zero placeholder ("00:00:00"): when no limit is configured, or the
          budget is genuinely exhausted, the surface says so explicitly instead of
          presenting a zero clock that looks like real data. -->
     <string name="srv_remaining_prefix">remaining today</string>
-    <string name="srv_no_limit">Today no lock!</string>
-    <string name="srv_limit_reached">Daily limit reached</string>
+    <string name="srv_no_limit">Open day — no retreat set</string>
+    <string name="srv_limit_reached">Retreat limit reached</string>
 
     <!-- ===================== ONBOARDING (first screen) =====================
-         The prominent warning banner at the very top of the onboarding screen.
+         The prominent notice banner at the very top of the onboarding screen.
          The wording is a hard requirement and MUST be rendered verbatim; it is
          an operator pre-requisite for provisioning Device Owner, which can only
          be set on an account-free, freshly-rebooted device. -->
-    <string name="onboarding_warning_banner">⚠️ CRITICAL SYSTEM REQUIREMENT: Before proceeding, you must factory reset your phone OR completely remove all accounts from the device, turn off auto-sync, and reboot your phone.</string>
+    <string name="onboarding_warning_banner">⚠️ BEFORE YOUR RETREAT CAN BEGIN: you must factory reset your phone OR completely remove all accounts from the device, turn off auto-sync, and reboot your phone.</string>
 
-    <string name="onboarding_title">Set up Screen Time Locker</string>
-    <string name="onboarding_steps_title">Permission steps</string>
-    <string name="onboarding_steps_placeholder">Permission steps will appear here.</string>
+    <string name="onboarding_title">Set up your Digital Retreat</string>
+    <string name="onboarding_steps_title">Preparation steps</string>
+    <string name="onboarding_steps_placeholder">Preparation steps will appear here.</string>
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_next">Next</string>
 
@@ -43,27 +43,27 @@
          own "Approve" button and a live state chip; the NEXT button stays
          disabled until the CURRENT item's live check returns true. -->
     <string name="perm_approve">Approve</string>
-    <string name="perm_state_granted">GRANTED</string>
+    <string name="perm_state_granted">READY</string>
     <string name="perm_state_needed">NEEDED</string>
     <string name="perm_state_locked">LOCKED</string>
 
     <string name="perm_autostart_title">Autostart permission</string>
     <string name="perm_autostart_short">Autostart</string>
-    <string name="perm_autostart_desc">Lets the app restart itself after a reboot. Tapping Approve opens your phone maker\'s autostart / startup settings — allow this app there. There is no way for an app to read that vendor toggle, so the app records your return from that screen to confirm it.</string>
+    <string name="perm_autostart_desc">Lets the retreat restart itself after a reboot. Tapping Approve opens your phone maker\'s autostart / startup settings — allow this app there. There is no way for an app to read that vendor toggle, so the app records your return from that screen to confirm it.</string>
 
     <string name="perm_notification_title">Notification permission</string>
     <string name="perm_notification_short">Notifications</string>
-    <string name="perm_notification_desc">Shows the lock reminder and the live remaining-time notification. Tapping Approve opens the standard notification prompt for this app.</string>
+    <string name="perm_notification_desc">Shows the retreat reminder and the live remaining-time notification. Tapping Approve opens the standard notification prompt for this app.</string>
 
     <string name="perm_battery_title">Battery optimization</string>
     <string name="perm_battery_short">Battery</string>
-    <string name="perm_battery_desc">Exempts the app from battery optimisation so the background guard is never frozen while the lock is due. Tapping Approve opens the system exemption dialog.</string>
+    <string name="perm_battery_desc">Exempts the app from battery optimisation so the background guardian is never frozen while the retreat is due. Tapping Approve opens the system exemption dialog.</string>
 
     <!-- ============================================================ -->
     <!-- Give Device Admin Permission — onboarding section (Kotlin)      -->
     <!-- ============================================================ -->
     <string name="dap_title">Give Device Admin Permission</string>
-    <string name="dap_intro">This app needs Device Owner rights to enforce the lock. Grant it either way \u2014 both run the SAME command.</string>
+    <string name="dap_intro">The retreat needs Device Owner rights to hold the screen. Grant it either way \u2014 both run the SAME command.</string>
 
     <string name="dap_option1_label">OPTION 1 \u00b7 MANUAL ADB FALLBACK</string>
     <string name="dap_option1_note">On a computer with the phone plugged in and USB debugging on, run the line above. Device Owner can only be set while no account or second user exists.</string>
@@ -93,42 +93,42 @@
     <string name="dap_dlg_not_running_body">Shizuku is installed but its service is not running.\n\nOpen the Shizuku app and start the service (via wireless debugging or ADB), then come back and tap APPROVE BY SHIZUKU again.</string>
 
     <string name="dap_dlg_granted_title">Device Owner granted</string>
-    <string name="dap_dlg_granted_body">This app is now the Device Owner.\n\nContinue to set up your daily focus limit.</string>
+    <string name="dap_dlg_granted_body">This app is now the Device Owner.\n\nContinue to set up your daily retreat.</string>
 
     <string name="dap_dlg_failed_title">Could not set Device Owner</string>
     <string name="dap_dlg_failed_body">Make sure the phone was factory reset (or has no accounts and no second user) and was rebooted, then try again \u2014 or use the ADB command from Option 1.</string>
 
     <!-- ===================== GATEKEEPER SPLASH (first surface) =====================
-         The strict gate that opens the app. It re-uses the hard-requirement warning
+         The strict gate that opens the app. It re-uses the hard-requirement notice
          banner (onboarding_warning_banner) verbatim, explains the full usage of the
-         screen lock app, and refuses to let the operator continue \u2014 or leave \u2014
+         Digital Retreat app, and refuses to let the operator continue \u2014 or leave \u2014
          until they explicitly acknowledge both. -->
-    <string name="splash_kicker">GATEKEEPER</string>
-    <string name="splash_title">Before Screen Time Locker can lock anything</string>
+    <string name="splash_kicker">DIGITAL RETREAT</string>
+    <string name="splash_title">Before your retreat can quiet the screen</string>
     <string name="splash_subtitle">Read this screen once, top to bottom. It is the only way into setup, and the back button is disabled here on purpose.</string>
 
-    <string name="splash_usage_header">How the screen lock app works</string>
-    <string name="splash_usage_intro">Everything the app does, in the order you will meet it. Nothing here needs technical knowledge.</string>
-    <string name="splash_usage_1_title">1 \u00b7 Choose your limit</string>
-    <string name="splash_usage_1_body">In the setup console you pick how much screen-on time you allow yourself each day (for example 2 hours), the time of day the counter resets, and how many seconds of warning you get before the screen turns off.</string>
+    <string name="splash_usage_header">How the retreat works</string>
+    <string name="splash_usage_intro">Everything the retreat does, in the order you will meet it. Nothing here needs technical knowledge.</string>
+    <string name="splash_usage_1_title">1 \u00b7 Choose your rest</string>
+    <string name="splash_usage_1_body">In the setup console you choose how much screen-on time you allow yourself each day (for example 2 hours), the time of day the counter resets, and how many seconds of warning you get before the screen turns off.</string>
     <string name="splash_usage_2_title">2 \u00b7 How time is counted</string>
     <string name="splash_usage_2_body">Time is counted only while the screen is actually on. When the screen is off the clock is paused, so your allowance reflects real usage and not idle hours.</string>
     <string name="splash_usage_3_title">3 \u00b7 What happens at the limit</string>
-    <string name="splash_usage_3_body">When your allowance for the current window is used up, the app shows a full-screen lock and keeps you out until the next window begins. The lock re-arms itself automatically after a reboot.</string>
+    <string name="splash_usage_3_body">When your allowance for the current window is used up, the retreat shows a full-screen sanctuary and keeps you out until the next window begins. The retreat re-arms itself automatically after a reboot.</string>
     <string name="splash_usage_4_title">4 \u00b7 The live counter</string>
-    <string name="splash_usage_4_body">While the limit is active a persistent notification shows your remaining time, counting down in lock-step with the lock screen. It is a read-out, never a control.</string>
+    <string name="splash_usage_4_body">While the retreat is active a persistent notification shows your remaining time, counting down in lock-step with the sanctuary screen. It is a read-out, never a control.</string>
     <string name="splash_usage_5_title">5 \u00b7 Finishing setup</string>
     <string name="splash_usage_5_body">Continue to setup, choose your values, confirm them, and the configuration is locked in. From that moment the settings surfaces are sealed.</string>
     <string name="splash_usage_6_title">6 \u00b7 Getting back in</string>
     <string name="splash_usage_6_body">After setup is locked, the console is reachable only on purpose: dial  *#*#84635#*#*  from the phone app and pass the biometric check. There is deliberately no PIN and no emergency release.</string>
     <string name="splash_usage_7_title">7 \u00b7 Reboots &amp; persistence</string>
-    <string name="splash_usage_7_body">A direct-boot receiver re-arms the guard the instant the system is up, before you even unlock the phone, so the policy survives reboots without any manual step.</string>
+    <string name="splash_usage_7_body">A direct-boot receiver re-arms the guardian the instant the system is up, before you even unlock the phone, so the retreat survives reboots without any manual step.</string>
 
     <string name="splash_learn_button">Learn Full App Usage</string>
-    <string name="splash_ack">I have read the warning above and I understand how Screen Time Locker works.</string>
+    <string name="splash_ack">I have read the notice above and I understand how Digital Retreat works.</string>
     <string name="splash_enter">I UNDERSTOOD \u2014 CONTINUE</string>
     <string name="splash_enter_locked">Tick the box above to continue</string>
-    <string name="splash_back_blocked">Back is disabled here \u2014 read the warning and confirm to continue.</string>
+    <string name="splash_back_blocked">Back is disabled here \u2014 read the notice and confirm to continue.</string>
 
     <!-- The gatekeeper's sequential MANUAL permission ladder. Three buttons are
          walked strictly in order; each opens the exact system surface for that one
@@ -141,36 +141,36 @@
 
     <!-- Bottom-sheet documentation opened from the gatekeeper splash. -->
     <string name="splash_sheet_kicker">FULL APP USAGE</string>
-    <string name="splash_sheet_intro">Everything the app does, in the order you will meet it. Nothing here requires technical knowledge.</string>
+    <string name="splash_sheet_intro">Everything the retreat does, in the order you will meet it. Nothing here requires technical knowledge.</string>
 
     <!-- ===================== STRICT SINGLE-PAGE GATEKEEPER =====================
          The one launcher entry. It pins the mandatory factory-reset /
-         remove-accounts warning banner (onboarding_warning_banner) to the top,
-         explains the app in a few lines, then walks FOUR prerequisites as four
+         remove-accounts notice banner (onboarding_warning_banner) to the top,
+         explains the retreat in a few lines, then walks FOUR prerequisites as four
          sequential buttons on the SAME page. Progression is refused (dynamic
          onResume re-check) until all four are approved; the fourth grants Device
          Owner silently through Shizuku. -->
-    <string name="gk_kicker">STRICT GATEKEEPER</string>
-    <string name="gk_title">Set up your screen lock in 4 steps</string>
+    <string name="gk_kicker">BEGIN THE RETREAT</string>
+    <string name="gk_title">Set up your retreat in 4 steps</string>
     <string name="gk_intro">Four quick permissions and you are set. We will guide you through each one \u2014 tap a button, come back, and the next step unlocks on its own.</string>
 
     <string name="gk_steps_header">Turn on 4 things</string>
     <string name="gk_steps_intro">Tap the highlighted button, then come back here. Each tap opens the exact settings screen for that one item \u2014 nothing is requested all at once.</string>
 
     <string name="gk_step_autostart_title">Autostart</string>
-    <string name="gk_step_autostart_short">Keeps the lock running after a restart.</string>
-    <string name="gk_step_autostart_desc">Lets the app restart itself after a reboot. Tapping opens your phone maker\'s autostart / startup settings \u2014 allow Screen Time Locker there. An app cannot read that vendor toggle, so your return from that screen is recorded to confirm it.</string>
+    <string name="gk_step_autostart_short">Keeps the retreat running after a restart.</string>
+    <string name="gk_step_autostart_desc">Lets the retreat restart itself after a reboot. Tapping opens your phone maker\'s autostart / startup settings \u2014 allow Digital Retreat there. An app cannot read that vendor toggle, so your return from that screen is recorded to confirm it.</string>
 
     <string name="gk_step_notifications_title">Notifications</string>
-    <string name="gk_step_notifications_short">Shows your countdown and lock alerts.</string>
-    <string name="gk_step_notifications_desc">Shows the lock reminder and the live remaining-time counter. Tapping opens the standard notification prompt for this app.</string>
+    <string name="gk_step_notifications_short">Shows your countdown and retreat alerts.</string>
+    <string name="gk_step_notifications_desc">Shows the retreat reminder and the live remaining-time counter. Tapping opens the standard notification prompt for this app.</string>
 
     <string name="gk_step_battery_title">Battery</string>
-    <string name="gk_step_battery_short">Stops the phone pausing the lock.</string>
-    <string name="gk_step_battery_desc">Exempts the app from battery optimisation so the background guard is never frozen while the lock is due. Tapping opens the system exemption dialog.</string>
+    <string name="gk_step_battery_short">Stops the phone pausing the retreat.</string>
+    <string name="gk_step_battery_desc">Exempts the app from battery optimisation so the background guardian is never frozen while the retreat is due. Tapping opens the system exemption dialog.</string>
 
     <string name="gk_step_owner_title">Device Admin</string>
-    <string name="gk_step_owner_short">Lets the app enforce the lock.</string>
+    <string name="gk_step_owner_short">Lets the retreat hold the screen.</string>
     <string name="gk_step_owner_desc">Grants Device Owner silently through the running Shizuku service: it lists users, removes every secondary user, then runs dpm set-device-owner \u2014 no PC, no cable. When the shell returns success this step is approved.</string>
 
     <!-- Short, friendly state words shown next to the status icon. -->
@@ -199,9 +199,9 @@
     <string name="gk_continue_header">Continue</string>
     <string name="gk_continue">CONTINUE TO SETUP</string>
     <string name="gk_continue_hint">Approve all four steps above to continue</string>
-    <string name="gk_back_blocked">The gatekeeper cannot be skipped \u2014 approve all four steps to continue.</string>
+    <string name="gk_back_blocked">The gate cannot be skipped \u2014 approve all four steps to continue.</string>
 
-    <string name="gk_toast_allow">Allow Screen Time Locker in the Shizuku dialog\u2026</string>
+    <string name="gk_toast_allow">Allow Digital Retreat in the Shizuku dialog\u2026</string>
     <string name="gk_status_started">Setting Device Owner through Shizuku\u2026</string>
     <string name="gk_status_owner_ok">Device Owner granted \u2014 all four steps approved.</string>
 </resources>

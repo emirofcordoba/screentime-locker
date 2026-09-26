@@ -6,7 +6,7 @@ import java.util.Calendar;
 
 /**
  * ============================================================================
- *  Sentinel TimeLock — weekly schedule configuration module
+ *  Digital Retreat — weekly schedule configuration module
  * ============================================================================
  *
  *  Lets the user carve individual weekdays out of the single daily interval so

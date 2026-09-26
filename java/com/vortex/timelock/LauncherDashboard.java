@@ -18,7 +18,7 @@ import java.util.Locale;
 
 /**
  * ============================================================================
- *  Sentinel TimeLock — launcher activity dashboard
+ *  Digital Retreat — launcher activity dashboard
  * ============================================================================
  *
  *  This is the single visible launcher entry for the app (it is what the
@@ -248,7 +248,7 @@ public class LauncherDashboard extends Activity implements HardwareTick.Sink {
         header.setLayoutParams(hlp);
 
         TextView title = new TextView(this);
-        title.setText("Screen Time");
+        title.setText("Digital Retreat");
         title.setTextColor(ui.text);
         title.setTextSize(24f);
         title.setTypeface(Ui.bold());
@@ -335,7 +335,7 @@ public class LauncherDashboard extends Activity implements HardwareTick.Sink {
         config.setLayoutParams(cfgLp);
 
         TextView cfgTitle = caption();
-        cfgTitle.setText("SAVED CONFIGURATION");
+        cfgTitle.setText("RETREAT CONFIGURATION");
         config.addView(cfgTitle);
 
         cfgDaily = configValue();
@@ -354,7 +354,7 @@ public class LauncherDashboard extends Activity implements HardwareTick.Sink {
 
         // ---- edit entrance (hidden once the configuration is locked in) ----
         consoleBtn = new Button(this);
-        consoleBtn.setText("Open setup console");
+        consoleBtn.setText("Open retreat console");
         consoleBtn.setAllCaps(false);
         consoleBtn.setTextSize(16f);
         consoleBtn.setTextColor(ui.onAccent);

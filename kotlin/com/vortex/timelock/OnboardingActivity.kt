@@ -10,7 +10,7 @@ import android.widget.TextView
 
 /**
  * ============================================================================
- *  Screen Time Locker — initial onboarding (first screen)
+ *  Digital Retreat — initial onboarding (first screen)
  * ============================================================================
  *
  *  Layout: [activity_onboarding.xml].

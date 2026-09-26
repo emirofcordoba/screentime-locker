@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Screen Time — kiosk lock preview</title>
+<title>Digital Retreat — kiosk lock preview</title>
 <style>
   /* ------------------------------------------------------------------
      Faithful CSS reconstruction of KioskDashboard's static view tree.
@@ -11,10 +11,10 @@
      Palette is copied verbatim from the KioskDashboard constants.
      ------------------------------------------------------------------ */
   :root{
-    --bg:#070C14; --card:#131C2B; --card2:#1F2C3E;
-    --txt:#F5F9FF; --muted:#C2CEDE; --faint:#7C8AA0;
-    --accent:#5AC8FA; --good:#34D399; --warn:#FBBF24; --danger:#FB7185;
-    --border:#2C3B52; --accent-soft:#0A2A3A; --danger-soft:#2C1315;
+    --bg:#0C1410; --card:#172019; --card2:#24322A;
+    --txt:#F3F7F1; --muted:#B4C2B7; --faint:#86948A;
+    --accent:#7FC8A9; --good:#6FBF9B; --warn:#E0A552; --danger:#E08573;
+    --border:#33453B; --accent-soft:#123029; --danger-soft:#2A1613;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{width:1080px;background:var(--bg)}
@@ -168,7 +168,7 @@
   <div class="header">
     <div class="mark">&#9201;</div>
     <div class="titles">
-      <div class="title">Screen Time</div>
+      <div class="title">Digital Retreat</div>
       <div class="subtitle">Daily limit enforced by this device</div>
     </div>
     <div class="pill">LOCKED</div>
@@ -234,10 +234,10 @@
 
     <div class="row">
       <div class="row-line">
-        <div class="dot" style="background:#FB7185"></div>
+        <div class="dot" style="background:#E08573"></div>
         <div class="row-body">
           <div class="row-title">Daily limit reached</div>
-          <div class="row-detail">Screen time is used up &mdash; the lock is now enforced</div>
+          <div class="row-detail">Digital retreat is used up &mdash; the lock is now enforced</div>
         </div>
         <div class="row-time">2m ago</div>
       </div>
@@ -246,7 +246,7 @@
 
     <div class="row">
       <div class="row-line">
-        <div class="dot" style="background:#FB7185"></div>
+        <div class="dot" style="background:#E08573"></div>
         <div class="row-body">
           <div class="row-title">Lock engaged</div>
           <div class="row-detail">The kiosk lock screen took over the display</div>
@@ -258,7 +258,7 @@
 
     <div class="row">
       <div class="row-line">
-        <div class="dot" style="background:#FBBF24"></div>
+        <div class="dot" style="background:#E0A552"></div>
         <div class="row-body">
           <div class="row-title">Navigation blocked</div>
           <div class="row-detail">The kiosk consumed the Back key before the system saw it</div>
@@ -270,7 +270,7 @@
 
     <div class="row">
       <div class="row-line">
-        <div class="dot" style="background:#7C8AA0"></div>
+        <div class="dot" style="background:#86948A"></div>
         <div class="row-body">
           <div class="row-title">Screen turned off</div>
           <div class="row-detail">Panel blanked 30s after the last wake signal</div>

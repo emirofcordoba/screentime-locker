@@ -58,8 +58,8 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
     // Only two colour tokens survive in the activity itself: the window
     // background and the panel fill. Every other colour, and every string the
     // lock screen used to lay out by hand, now belongs to the dashboard module.
-    private static final int BG   = Color.parseColor("#070C14");
-    private static final int CARD = Color.parseColor("#131C2B");
+    private static final int BG   = Color.parseColor("#0C1410");
+    private static final int CARD = Color.parseColor("#172019");
 
     private static WeakReference<LockActivity> sInstance = new WeakReference<>(null);
 
@@ -495,7 +495,7 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(rounded(CARD, 26, Color.parseColor("#2C3B52")));
+        card.setBackground(rounded(CARD, 26, Color.parseColor("#33453B")));
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
         card.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -546,7 +546,7 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         long until = BootState.lockUntil(this);
         android.widget.TextView sub = new android.widget.TextView(this);
         sub.setText(until > 0L ? "Unlocks " + formatClock(this, until) : "Locked");
-        sub.setTextColor(Color.parseColor("#9FB0C8"));
+        sub.setTextColor(Color.parseColor("#A6B4A9"));
         sub.setTextSize(15f);
         sub.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -560,16 +560,16 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         if (battery != null) {
             android.widget.TextView batt = new android.widget.TextView(this);
             batt.setText(battery);
-            batt.setTextColor(Color.parseColor("#C2CEDE"));
+            batt.setTextColor(Color.parseColor("#B4C2B7"));
             batt.setTextSize(13f);
             batt.setTypeface(Ui.mono(), android.graphics.Typeface.BOLD);
             batt.setGravity(Gravity.CENTER);
             batt.setPadding(dp(11), dp(6), dp(11), dp(6));
             GradientDrawable bg = new GradientDrawable();
             bg.setShape(GradientDrawable.RECTANGLE);
-            bg.setColor(Color.parseColor("#1F2C3E"));
+            bg.setColor(Color.parseColor("#24322A"));
             bg.setCornerRadius(dp(14));
-            bg.setStroke(dp(1), Color.parseColor("#2C3B52"));
+            bg.setStroke(dp(1), Color.parseColor("#33453B"));
             batt.setBackground(bg);
             FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);

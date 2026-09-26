@@ -10,7 +10,7 @@ import android.os.Looper;
 import android.util.Log;
 
 /**
- * Sentinel TimeLock — native biometric identity module.
+ * Digital Retreat — native biometric identity module.
  *
  * Identity is never re-proven by recovering a stored secret; it is proven by
  * the platform's own biometric stack. There is no alternate secret and no

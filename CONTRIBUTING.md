@@ -1,10 +1,10 @@
-# Contributing to Screen Time Locker
+# Contributing to Digital Retreat
 
 Thanks for helping. This project has a specific personality, and the useful contributions respect it.
 
 ## The one rule
 
-Never weaken the core promise. Screen Time Locker is hard and non-bypassable **on purpose**. Pull requests that add an unlock button, a recovery backdoor, a hidden reset, or any way to escape the lock early will be closed. If you think there should be an escape hatch, that is a different app — fork it.
+Never weaken the core promise. Digital Retreat is hard and non-bypassable **on purpose**. Pull requests that add an unlock button, a recovery backdoor, a hidden reset, or any way to escape the lock early will be closed. If you think there should be an escape hatch, that is a different app — fork it.
 
 ## What helps
 

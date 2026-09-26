@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Sentinel TimeLock — admin console / setup.
+ * Digital Retreat — admin console / setup.
  *
  * Everything is chosen by the USER: the daily restriction interval, the time of
  * day the counter resets, how the lock behaves, and which extra protections are
@@ -217,7 +217,7 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
         kickerRow.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView kicker = new TextView(this);
-        kicker.setText("SENTINEL TIMELOCK");
+        kicker.setText("DIGITAL RETREAT");
         kicker.setTextColor(ui.accent);
         kicker.setTextSize(12f);
         kicker.setLetterSpacing(0.18f);
@@ -239,7 +239,7 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
         head.addView(kickerRow);
 
         TextView title = new TextView(this);
-        title.setText("Screen time, on your terms");
+        title.setText("Digital retreat, on your terms");
         title.setTextColor(ui.text);
         title.setTextSize(26f);
         title.setTypeface(Ui.bold());
@@ -351,7 +351,7 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
             gateState.setTextColor(ui.textDim);
         }
         BiometricAuth.authenticate(this,
-                "Unlock Sentinel TimeLock",
+                "Unlock Digital Retreat",
                 "Confirm your identity to authorise access to the settings",
                 new BiometricAuth.Callback() {
                     @Override
@@ -538,9 +538,9 @@ public class SetupActivity extends Activity implements HardwareTick.Sink {
         c.addView(divider());
         TextView steps = new TextView(this);
         steps.setText("Transferring from Dhizuku:\n"
-                + "1.  Activate Sentinel TimeLock as a device admin (button below).\n"
+                + "1.  Activate Digital Retreat as a device admin (button below).\n"
                 + "2.  In Dhizuku, open the device-owner / transfer option.\n"
-                + "3.  Pick Sentinel TimeLock as the target and confirm.\n\n"
+                + "3.  Pick Digital Retreat as the target and confirm.\n\n"
                 + "This build advertises ownership-transfer support, so the old "
                 + "\"Provided target does not support ownership transfer\" error no longer occurs. "
                 + "The target must be an ACTIVE device admin before the transfer.");

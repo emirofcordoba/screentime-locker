@@ -1,29 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Onboarding design tokens (LIGHT reference palette).
+  Digital Retreat design tokens (LIGHT "daylight" palette).
 
-  These mirror the values in Ui.java so the XML onboarding screen reads with
-  exactly the same colours as the programmatically-drawn console. A values-night
-  override supplies the balanced dark counterpart.
+  Warm paper, deep-forest ink and a calm evergreen accent. These mirror the
+  values in Ui.java so the XML onboarding screen reads with exactly the same
+  colours as the programmatically-drawn console. A values-night override
+  supplies the balanced dark "nightfall" counterpart.
 -->
 <resources>
     <!-- window / surfaces -->
-    <color name="screen_bg">#F2F5FA</color>
+    <color name="screen_bg">#F4F1EA</color>
     <color name="surface">#FFFFFF</color>
-    <color name="surface_alt">#EFF3F9</color>
-    <color name="border">#D3DCE8</color>
+    <color name="surface_alt">#EDE8DE</color>
+    <color name="border">#DAD3C4</color>
 
     <!-- text -->
-    <color name="text_primary">#10151F</color>
-    <color name="text_secondary">#51607A</color>
-    <color name="text_faint">#7C8AA0</color>
+    <color name="text_primary">#1E2A24</color>
+    <color name="text_secondary">#4C5B52</color>
+    <color name="text_faint">#86948A</color>
 
     <!-- accent (primary action) -->
-    <color name="accent">#0B7BD6</color>
+    <color name="accent">#2F6F5E</color>
     <color name="accent_text">#FFFFFF</color>
 
-    <!-- warning banner (high-contrast danger surface) -->
-    <color name="banner_bg">#D64550</color>
+    <!-- notice banner (high-contrast clay surface) -->
+    <color name="banner_bg">#C0563A</color>
     <color name="banner_text">#FFFFFF</color>
-    <color name="banner_stroke">#8F2730</color>
+    <color name="banner_stroke">#8A3A24</color>
 </resources>

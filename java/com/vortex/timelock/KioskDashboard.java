@@ -41,7 +41,7 @@ import java.util.Locale;
  * {@link LockActivity#onVolumeStep}).
  *
  * <pre>
- *   [mark] Screen Time                                   [ LOCKED ]
+ *   [mark] Digital Retreat                                   [ LOCKED ]
  *   -----------------------------------------------------
  *   TIME UNTIL UNLOCK
  *   01:23:45
@@ -80,22 +80,22 @@ import java.util.Locale;
 final class KioskDashboard extends LinearLayout {
 
     // ---- kiosk palette (always dark, matches LockTheme) ----
-    private static final int BG         = Color.parseColor("#070C14");
-    private static final int CARD       = Color.parseColor("#131C2B");
-    private static final int CARD2      = Color.parseColor("#1F2C3E");
-    private static final int TXT        = Color.parseColor("#F5F9FF");
-    private static final int MUTED      = Color.parseColor("#C2CEDE");
-    private static final int FAINT      = Color.parseColor("#7C8AA0");
-    private static final int ACCENT     = Color.parseColor("#5AC8FA");
-    private static final int GOOD       = Color.parseColor("#34D399");
-    private static final int WARN       = Color.parseColor("#FBBF24");
-    private static final int DANGER     = Color.parseColor("#FB7185");
-    private static final int BORDER     = Color.parseColor("#2C3B52");
+    private static final int BG         = Color.parseColor("#0C1410");
+    private static final int CARD       = Color.parseColor("#172019");
+    private static final int CARD2      = Color.parseColor("#24322A");
+    private static final int TXT        = Color.parseColor("#F3F7F1");
+    private static final int MUTED      = Color.parseColor("#B4C2B7");
+    private static final int FAINT      = Color.parseColor("#86948A");
+    private static final int ACCENT     = Color.parseColor("#7FC8A9");
+    private static final int GOOD       = Color.parseColor("#6FBF9B");
+    private static final int WARN       = Color.parseColor("#E0A552");
+    private static final int DANGER     = Color.parseColor("#E08573");
+    private static final int BORDER     = Color.parseColor("#33453B");
 
-    private static final int ACCENT_SOFT = Color.parseColor("#0A2A3A");
-    private static final int GOOD_SOFT   = Color.parseColor("#08281C");
-    private static final int WARN_SOFT   = Color.parseColor("#2E2200");
-    private static final int DANGER_SOFT = Color.parseColor("#2C1315");
+    private static final int ACCENT_SOFT = Color.parseColor("#123029");
+    private static final int GOOD_SOFT   = Color.parseColor("#12281F");
+    private static final int WARN_SOFT   = Color.parseColor("#2E2412");
+    private static final int DANGER_SOFT = Color.parseColor("#2A1613");
 
     /**
      * THE NO-DATA SENTINEL, and the only legal seed for a numeric read-out.
@@ -279,7 +279,7 @@ final class KioskDashboard extends LinearLayout {
         titles.setOrientation(VERTICAL);
         titles.setLayoutParams(new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        titles.addView(text("Screen Time", 20, TXT, Typeface.BOLD));
+        titles.addView(text("Digital Retreat", 20, TXT, Typeface.BOLD));
         TextView sub = text("Daily limit enforced by this device", 12.5f, FAINT, Typeface.NORMAL);
         sub.setPadding(0, dp(2), 0, 0);
         titles.addView(sub);
@@ -677,7 +677,7 @@ final class KioskDashboard extends LinearLayout {
         } else if (s.limitMs > 0L) {
             setIfChanged(heroLabel, "TIME LEFT TODAY");
             setIfChanged(heroValue, KioskSnapshot.hms(s.budgetLeftMs()));
-            setIfChanged(heroUnlockAt, "Screen time is available right now");
+            setIfChanged(heroUnlockAt, "Digital retreat is available right now");
             setColorIfChanged(heroUnlockAt, ACCENT);
         } else {
             setIfChanged(heroLabel, "TIME REMAINING");

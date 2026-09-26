@@ -12,7 +12,7 @@ import rikka.shizuku.Shizuku
 
 /**
  * ============================================================================
- *  Screen Time Locker — "Give Device Admin Permission" step (Kotlin migration)
+ *  Digital Retreat — "Give Device Admin Permission" step (Kotlin migration)
  * ============================================================================
  *
  *  A self-contained onboarding card. The grant is FORCE-PROVISIONED through

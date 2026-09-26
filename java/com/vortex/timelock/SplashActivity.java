@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * ============================================================================
- *  Screen Time Locker — strict GATEKEEPER splash (first surface)
+ *  Digital Retreat — strict GATEKEEPER splash (first surface)
  * ============================================================================
  *
  *  The very first screen of the app, and a hard gate: the operator cannot get

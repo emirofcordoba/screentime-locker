@@ -553,7 +553,7 @@ final class Engine {
             }
         }
         // Lock-step with the console component. The alias targets .LauncherDashboard,
-        // whose "Open setup console" button starts .SetupActivity, so a visible icon
+        // whose "Open retreat console" button starts .SetupActivity, so a visible icon
         // is dead weight (and the admin entry is unreachable from it) if the console
         // component itself is disabled. Showing the icon re-enables the console;
         // the normal conceal path leaves the console governed by

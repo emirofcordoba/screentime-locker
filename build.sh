@@ -1,6 +1,6 @@
 #!/bin/sh
 # =============================================================================
-#  Screen Time Locker — fully automated, standalone APK build
+#  Digital Retreat — fully automated, standalone APK build
 # =============================================================================
 #  Turns this source tree straight into a signed, installable APK using only
 #  the Android SDK command-line tools. No Gradle, no Android Studio.
@@ -1229,7 +1229,7 @@ ensure_keystore() {
       keytool -genkeypair -keystore "$SIGNING_STORE" -alias "timelock-test" \
         -keyalg RSA -keysize 2048 -validity 10000 -storetype PKCS12 \
         -storepass "testkey123" -keypass "testkey123" \
-        -dname "CN=Screen Time Locker TEST KEY (DO NOT SHIP), OU=Open Source Test, O=Community, C=US" >/dev/null
+        -dname "CN=Digital Retreat TEST KEY (DO NOT SHIP), OU=Open Source Test, O=Community, C=US" >/dev/null
       SIGNING_ALIAS="timelock-test"; SIGNING_PASS="testkey123"
     else
       # No release keystore: fall back to the public test key so the build can
@@ -1245,7 +1245,7 @@ ensure_keystore() {
         keytool -genkeypair -keystore "$SIGNING_STORE" -alias "timelock-test" \
           -keyalg RSA -keysize 2048 -validity 10000 -storetype PKCS12 \
           -storepass "testkey123" -keypass "testkey123" \
-          -dname "CN=Screen Time Locker TEST KEY (DO NOT SHIP), OU=Open Source Test, O=Community, C=US" >/dev/null
+          -dname "CN=Digital Retreat TEST KEY (DO NOT SHIP), OU=Open Source Test, O=Community, C=US" >/dev/null
       fi
     fi
   fi
@@ -1267,7 +1267,7 @@ ensure_keystore() {
 # =============================================================================
 #  Run the provisioning pipeline
 # =============================================================================
-say "Screen Time Locker — automated standalone build"
+say "Digital Retreat — automated standalone build"
 info "host         : ${ARCH}$( [ "$IS_TERMUX" = 1 ] && printf ' (Termux)' ) | pkg-manager: $PM | auto-install: $AUTO_INSTALL"
 info "toolchain dir: $TOOLCHAIN_DIR"
 

@@ -2,7 +2,7 @@
 
 ## Scope
 
-Screen Time Locker deliberately uses powerful Android features. It can become Device Owner and enforce a non-bypassable kiosk lock. That is the product, not a vulnerability. Please do not report "hard to uninstall" or "there is no unlock" as security issues — those are documented design choices, explained in [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md).
+Digital Retreat deliberately uses powerful Android features. It can become Device Owner and enforce a non-bypassable kiosk lock. That is the product, not a vulnerability. Please do not report "hard to uninstall" or "there is no unlock" as security issues — those are documented design choices, explained in [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md).
 
 What **is** in scope:
 

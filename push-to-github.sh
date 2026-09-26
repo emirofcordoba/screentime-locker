@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  Screen Time Locker — one-click push to GitHub
+#  Digital Retreat — one-click push to GitHub
 # =============================================================================
 #  Commits the current working tree and pushes it straight to GitHub, using a
 #  personal access token. No prompts, no interactive git, single command.
@@ -56,7 +56,7 @@ if ! git config user.name  >/dev/null 2>&1; then git config user.name  "Emir of 
 if ! git config user.email >/dev/null 2>&1; then git config user.email "159137813+emirofcordoba@users.noreply.github.com"; fi
 
 # ----- commit any pending work ----------------------------------------------
-MSG="${1:-Update Screen Time Locker ($(date '+%Y-%m-%d %H:%M'))}"
+MSG="${1:-Update Digital Retreat ($(date '+%Y-%m-%d %H:%M'))}"
 
 git add -A
 if git diff --cached --quiet; then
