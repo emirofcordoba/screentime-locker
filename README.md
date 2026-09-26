@@ -59,7 +59,8 @@ The only way in is to wait for the window to end.
 - **Zero-cost idle.** No wake locks and no polling. Timers are passive alarms plus the platform's `JobScheduler`.
 - **Quiet when locked.** The moment the lock engages, background apps are stopped and mobile data and Wi-Fi are switched off; on unlock every radio is restored exactly as it was. A locked phone becomes a quiet phone.
 - **Live status-bar countdown.** Seconds remaining, drawn natively by SystemUI.
-- **On-screen brightness control.** The lock screen sets the panel level and adaptive-brightness mode from a slider and switch — device-wide, with no extra permission.
+- **On-screen brightness control.** The lock screen sets the panel level and adaptive-brightness mode from a slider and switch — device-wide, with no extra permission. The volume rocker doubles as a hardware shortcut while locked: Volume Up brightens, Volume Down dims, one fixed step at a time.
+- **Shortcuts card.** The lock screen lists the hardware gestures that still work (the volume-rocker brightness shortcut) instead of a recent-activity log.
 - **Per-weekday limits.** Give each day its own budget, or switch a day off.
 - **Optional hardening.** Block Safe Mode, block factory reset, disable USB debugging and freeze granted permissions. All off by default.
 - **Light and dark themes** from a single design-token layer.

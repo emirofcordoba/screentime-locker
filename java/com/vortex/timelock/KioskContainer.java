@@ -21,9 +21,19 @@ import android.widget.FrameLayout;
  *   HARD navigation signals
  *       Physical / hardware keys are consumed here, at the top of the view tree,
  *       before the framework can act on them: BACK, HOME, APP_SWITCH (overview),
- *       MENU, the volume rocker, CAMERA, SEARCH and ESCAPE. System-wide HOME /
- *       OVERVIEW escapes are additionally denied out of process by device-owner
- *       lock task (LOCK_TASK_FEATURE_NONE) applied in {@link Engine}.
+ *       MENU, CAMERA, SEARCH and ESCAPE. System-wide HOME / OVERVIEW escapes are
+ *       additionally denied out of process by device-owner lock task
+ *       (LOCK_TASK_FEATURE_NONE) applied in {@link Engine}.
+ *
+ *       The POWER button is never touched: it is not (and cannot be) listed in
+ *       {@link #BLOCKED_KEYS}, so the platform's own power handling always wins
+ *       and pressing it turns the panel off for good. The window is hardened
+ *       WITHOUT a forced screen-on (see {@link #hardenWindow}), so the kiosk
+ *       never turns the panel back on behind the user's back.
+ *
+ *       The volume rocker is also not a navigation key: it is consumed only to
+ *       be re-purposed as the brightness shortcut (Volume Up = brighter,
+ *       Volume Down = dimmer) via {@link VolumeSink}.
  *
  *   SOFT navigation signals
  *       The system bars (status bar + the navigation / gesture pill) are hidden
@@ -41,21 +51,37 @@ public class KioskContainer extends FrameLayout {
         void onUserWakeSignal();
     }
 
-    /** Hardware keys swallowed by the container (hard nav signals). */
+    /**
+     * Hardware keys swallowed by the container (hard nav signals).
+     *
+     * <p>KEYCODE_POWER is deliberately absent: Android does not deliver it to
+     * apps and the kiosk must never sit between the user and the power button.
+     * KEYCODE_VOLUME_UP/DOWN are absent too -- they are handled separately below
+     * as the brightness shortcut rather than being blocked.
+     */
     private static final int[] BLOCKED_KEYS = {
             KeyEvent.KEYCODE_BACK,
             KeyEvent.KEYCODE_HOME,
             KeyEvent.KEYCODE_APP_SWITCH,
             KeyEvent.KEYCODE_MENU,
-            KeyEvent.KEYCODE_VOLUME_UP,
-            KeyEvent.KEYCODE_VOLUME_DOWN,
-            KeyEvent.KEYCODE_VOLUME_MUTE,
             KeyEvent.KEYCODE_CAMERA,
             KeyEvent.KEYCODE_SEARCH,
             KeyEvent.KEYCODE_ESCAPE,
     };
 
+    /**
+     * Receiver of hardware volume-rocker steps. Inside the kiosk the rocker never
+     * changes media volume: the container consumes it and hands the direction to
+     * the host, which maps it to screen brightness -- the first kiosk shortcut
+     * (Volume Up = brighter, Volume Down = dimmer).
+     */
+    public interface VolumeSink {
+        /** @param direction +1 for Volume Up, -1 for Volume Down. */
+        void onVolumeStep(int direction);
+    }
+
     private WakeSink wakeSink;
+    private VolumeSink volumeSink;
     private Activity activity;
     private long lastKeyLogMs = 0L;
 
@@ -74,6 +100,8 @@ public class KioskContainer extends FrameLayout {
 
     public void setWakeSink(WakeSink s) { this.wakeSink = s; }
 
+    public void setVolumeSink(VolumeSink s) { this.volumeSink = s; }
+
     // ------------------------------------------------------------- soft lockdown
 
     /** Hide and keep hidden the soft navigation surface (immersive-sticky). */
@@ -89,21 +117,29 @@ public class KioskContainer extends FrameLayout {
     }
 
     /**
-     * Window-level hardening: kiosk window flags (show over keyguard, turn the
-     * panel on, keep the layout stable) plus the capture block so the lock
-     * screen can never be screenshotted or exposed as a recents thumbnail.
+     * Window-level hardening: kiosk window flags (show over keyguard, dismiss the
+     * keyguard) plus the capture block so the lock screen can never be
+     * screenshotted or exposed as a recents thumbnail. It intentionally does NOT
+     * force the panel on: the power button is left entirely to the platform.
      */
     public void hardenWindow(Activity a, boolean blockCapture) {
         this.activity = a;
         try {
+            // The power button is NOT intercepted. FLAG_TURN_SCREEN_ON /
+            // setTurnScreenOn(true) are deliberately omitted: forcing the panel
+            // back on every time this activity is shown or resumed is exactly what
+            // made the phone appear to "turn itself back on" a moment after the
+            // user switched it off with the power button (and then fall asleep
+            // again). With them gone, a power-button press turns the screen off
+            // and it stays off. Enforcement is unaffected: lock-task plus the
+            // persistent HOME preference keep this activity on top, so the moment
+            // the screen is switched back on the kiosk is already there.
             int flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                    | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-                    | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
+                    | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD;
             if (blockCapture) flags |= WindowManager.LayoutParams.FLAG_SECURE;
             a.getWindow().addFlags(flags);
             if (Build.VERSION.SDK_INT >= 27) {
                 a.setShowWhenLocked(true);
-                a.setTurnScreenOn(true);
             }
         } catch (Throwable ignored) {}
         applyImmersive();
@@ -117,7 +153,23 @@ public class KioskContainer extends FrameLayout {
         boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
         if (down && wakeSink != null) wakeSink.onUserWakeSignal();
 
-        if (isBlocked(event.getKeyCode())) {
+        int code = event.getKeyCode();
+
+        // Volume rocker -> brightness shortcut. Consumed on BOTH edges so the
+        // platform's own media-volume handling never sees the key and never
+        // fights (or doubles) our change. POWER is never in this path: the
+        // container must not -- and cannot -- intercept it.
+        if (code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (down && volumeSink != null) {
+                volumeSink.onVolumeStep(code == KeyEvent.KEYCODE_VOLUME_UP ? +1 : -1);
+            }
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_VOLUME_MUTE) {
+            return true; // muted kiosk: swallow, never change media volume
+        }
+
+        if (isBlocked(code)) {
             long now = System.currentTimeMillis();
             if (down && now - lastKeyLogMs > 1000L) {
                 lastKeyLogMs = now;

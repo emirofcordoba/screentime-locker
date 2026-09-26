@@ -37,6 +37,12 @@ As Device Owner it can:
 
 It uses none of these unless it is the genuine Device Owner, and every call is wrapped so a missing permission cannot crash the system.
 
+## The power button and the shortcuts
+
+A kiosk lock that fights the power button is a kiosk lock that misbehaves. This one leaves it alone: pressing power switches the screen off, and it stays off, because the lock surface never asks the system to turn the panel back on. There is no wake lock and no forced screen-on flag — only a short display-sleep watchdog that runs while the lock is engaged and lets the screen rest like any other Android screen. Turn the phone back on and the lock is simply there, since the lock-task kiosk and the persistent HOME preference are still in force.
+
+Blocking keys is equally narrow. Back, Home and Recents are consumed while locked, and nothing else is. The volume rocker is not blocked but re-purposed: it becomes a hardware shortcut, because a locked phone still has to be usable as a phone. The lock screen's **Shortcuts** card lists what works — today, the volume-rocker brightness shortcut. Volume Up brightens, Volume Down dims, one fixed step per press, and the on-screen slider follows along. The activity log that used to sit there is gone from the lock surface; the app still records those events for status and diagnostics.
+
 ## Surviving a reboot
 
 Restarting the phone is the obvious way to cheat, so the app uses direct boot.

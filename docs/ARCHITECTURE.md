@@ -62,10 +62,10 @@ Five rough layers. Lower layers never reach upward.
 | `OnboardingActivity` | Warning banner and steps container. Ships in Java and Kotlin; the Kotlin copy wins. |
 | `SetupActivity` | The admin console: interval, reset time, warning seconds, behaviour, protections. Reached only by dial code plus biometrics. |
 | `StatusActivity` | Always-available read-only status screen. Every notification opens it by explicit component. Never mutates a preference. |
-| `LockActivity` | The kiosk lock. Blocks Back, Home and Recents and disables the status bar and keyguard. Direct-boot aware so it re-arms pre-unlock. |
+| `LockActivity` | The kiosk lock. Blocks Back, Home and Recents and disables the status bar and keyguard, while leaving the power button to the system and routing the volume rocker to the brightness shortcut. Direct-boot aware so it re-arms pre-unlock. |
 | `LauncherDashboard` | Read-only remaining-time view. Never mutates a preference. |
 | `KioskContainer`, `KioskDashboard`, `KioskSnapshot` | The lockdown surface and the readable projection of the kiosk state used by every tick. |
-| `KioskLogEvent`, `KioskLogParser`, `KioskLogStore` | The kiosk activity log and its readable projection. |
+| `KioskLogEvent`, `KioskLogParser`, `KioskLogStore` | The kiosk activity log and its readable projection. Still recorded for status and diagnostics, but no longer drawn on the lock screen. |
 | `IntervalSelector`, `WeekdayScheduleCard`, `SheetDialog`, `TimeFmt`, `Ui` | Reusable UI, the wall-clock formatter and the light and dark design-token layer. |
 
 ## Consent
@@ -78,7 +78,7 @@ Five rough layers. Lower layers never reach upward.
 |---|---|
 | `ShizukuBridge` | The only place the app talks to Shizuku. A thin defensive wrapper over the bundled client. |
 | `ShizukuShell` | Kotlin counterpart of the Shizuku shell path. |
-| `Brightness` | Device-Owner `setSystemSetting` writes for the kiosk brightness control. No runtime permission, no app-op. |
+| `Brightness` | Device-Owner `setSystemSetting` writes for the kiosk brightness control. No runtime permission, no app-op. Exposes the level read/write plus the fixed `STEP` used by the volume-rocker shortcut. |
 | `BiometricAuth` | Native biometric identity. No stored secret of any kind. |
 | `SecretCodeReceiver` | Hidden admin doorbell at `*#*#84635#*#*`. A doorbell, not a bypass, since the biometric check still stands behind it. |
 | `CountdownTicker`, `HardwareTick`, `LiveCountdown`, `VsyncFrameClock` | The 1 Hz tick handler and the status-bar countdown optimiser. |

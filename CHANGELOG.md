@@ -4,13 +4,20 @@ Notable changes to Screen Time Locker, following [Keep a Changelog](https://keep
 
 ## Unreleased
 
+### Added
+- **Kiosk Shortcuts card.** The lock screen's *Recent activity* log has been removed and replaced by a **SHORTCUTS** card that documents the hardware gestures available to the person holding the locked phone. The card is built once and never rebound, so it adds nothing to the per-second render cost, and a future shortcut is a single `addShortcut` call. The first shortcut is the volume rocker.
+- **Volume-rocker brightness shortcut.** Inside the kiosk the volume rocker no longer changes media volume: Volume Up brightens and Volume Down dims the panel. One press moves the level by a fixed `Brightness.STEP` (10/255, about 4%), clamped to `Brightness.MIN_LEVEL`..`MAX` so a press can dim the screen but never black it out. The current level is re-read from `Settings.System` on every press and written through the Device-Owner `Brightness.setLevel` path (adaptive mode is cleared first), and the on-screen slider and the percentage are nudged on the same frame so the read-out never lags the key.
+
 ### Changed
+- **The kiosk no longer intercepts the power button, and no longer forces the panel on.** `KioskContainer.hardenWindow` drops `FLAG_TURN_SCREEN_ON` / `setTurnScreenOn(true)`, which previously made the panel come back on a moment after the user switched it off with the power button (and then fall asleep again about 10 s later when the display-sleep watchdog fired). `KEYCODE_POWER` is deliberately absent from the container's blocked-key set, so pressing the power button now switches the screen off and it stays off; lock-task plus the persistent HOME preference still keep the kiosk on top, so it is already there when the screen is switched back on. The volume keys are no longer blocked either - they are re-purposed as the brightness shortcut.
+- **The lock screen no longer shows the activity log.** `KioskDashboard` drops the `RECENT ACTIVITY` card, its pre-built row pool and the per-tick activity bind. The underlying `KioskLog*` helpers are unchanged and event recording continues; only the lock-screen projection changed.
 - **Full documentation pass.** Every Markdown file (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, `libs/README.md` and all of `docs/`) rewritten for accuracy, consistency and clarity.
 - Architecture and libs docs now reflect the classes actually shipped: `BatteryGuard`, `ShizukuHardener`, `Brightness`, `StatusActivity`, `PowerStateReceiver`, `TimeFmt`, the `KioskLog*` helpers, `SplashActivity` and `TransitionGate` are documented, and `libs/` no longer claims Shizuku is used for a single purpose.
 - Documentation cross-links, tone and formatting standardised across the set; troubleshooting lines now quote the real commands and output.
 
 ### Notes
-- No code, build script, manifest or version identity changed in this pass — documentation only.
+- The kiosk changes above touch only `KioskContainer`, `KioskDashboard` and `LockActivity`; no manifest, build script or version identity changed, and the app still builds to the same package.
+- The following documentation entries are from the earlier documentation-only pass.
 
 ## 7.1 - 2026-09-26
 

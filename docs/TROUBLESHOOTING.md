@@ -30,6 +30,10 @@
 
 **The screen blinks or random apps open.** This happens when an app makes itself a launcher without being the owner. This build registers the kiosk HOME only while a lock is genuinely active and the app is the real Device Owner. If you see it, the app is not actually Device Owner, so check the console status card.
 
+**The screen switches itself back on after I press power while locked.** It should not. The kiosk never asks the system to relight the panel: it sets no wake lock and no turn-screen-on flag, and it leaves `KEYCODE_POWER` alone, so power means off and off means off. If a device still relights on its own, another OEM feature is doing it — check vendor display or "raise to wake" settings, and confirm you are on a build that includes the power-button fix.
+
+**The volume keys no longer change media volume while locked.** That is intended. Inside the kiosk the rocker is the brightness shortcut: Volume Up brightens, Volume Down dims, one fixed step per press. The **Shortcuts** card on the lock screen lists this. Media volume returns to normal the moment the lock lifts.
+
 ## Removing the app
 
 A normal uninstall is blocked by design. There is no `adb` command here that removes or disables the lock. The only revert is a factory reset, and only if *Block factory reset* was left off. If it was enabled, the device must be re-flashed. See the removal section of [INSTALLATION.md](INSTALLATION.md).

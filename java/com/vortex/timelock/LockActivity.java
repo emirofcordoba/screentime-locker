@@ -150,6 +150,7 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
             }
             buildPreUnlockUi();
             container.attachActivity(this);
+            container.setVolumeSink(this::onVolumeStep);
             container.hardenWindow(this, true);
             container.requestFocus();
             try { getWindow().setStatusBarColor(Color.BLACK); } catch (Throwable ignored) {}
@@ -387,6 +388,48 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         if (wakeGuard != null && Prefs.optScreenOff(this)) wakeGuard.signal("user-signal");
     }
 
+    /**
+     * Default kiosk shortcut: the hardware volume rocker adjusts the panel
+     * brightness - Volume Up brightens, Volume Down dims.
+     *
+     * <p>Built to be flawless rather than merely "usually works":
+     * <ul>
+     *   <li>The current level is re-read from {@code Settings.System} on every
+     *       press, so a value set by the on-screen slider, by any other surface,
+     *       or carried across a reboot is never lost or jumped over.</li>
+     *   <li>The write goes through {@link Brightness#setLevel}, i.e. the
+     *       Device-Owner {@code setSystemSetting} path - no runtime permission,
+     *       no {@code WRITE_SETTINGS} app-op, no Shizuku round-trip.</li>
+     *   <li>Auto brightness is switched off first by that same call, so a manual
+     *       step actually takes effect on devices that ignore a manual level while
+     *       adaptive mode is on.</li>
+     *   <li>The level is clamped to {@code [MIN_LEVEL, MAX]}, so a press can dim
+     *       the panel but never black it out.</li>
+     *   <li>The on-screen slider is nudged on the same frame, instead of waiting
+     *       for the next 1 Hz tick, so the read-out never lags the key.</li>
+     *   <li>Everything is wrapped: a vendor HAL that refuses the write leaves the
+     *       panel exactly as it was instead of killing the key handler.</li>
+     * </ul>
+     */
+    private void onVolumeStep(int direction) {
+        if (direction == 0) return;
+        try {
+            int current = Brightness.level(this);
+            if (current < 0) current = Brightness.MAX / 2;
+
+            int next = current + (direction > 0 ? 1 : -1) * Brightness.STEP;
+            if (next < Brightness.MIN_LEVEL) next = Brightness.MIN_LEVEL;
+            if (next > Brightness.MAX) next = Brightness.MAX;
+            if (next == current) return; // already at the rail: nothing to write
+
+            Brightness.setLevel(this, next);
+            if (dashboard != null) dashboard.showBrightnessLevel(next);
+            Log.i(TAG, "volume-brightness " + current + " -> " + next);
+        } catch (Throwable t) {
+            Log.w(TAG, "volume-brightness", t);
+        }
+    }
+
     /** Turn the panel off the graceful way: lockNow() as owner (screen off + lock). */
     private void turnScreenOffGracefully() {
         try {
@@ -423,6 +466,8 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         container = new KioskContainer(this);
         container.setBackgroundColor(BG);
         container.setWakeSink(this::onUserWakeSignal);
+        // First kiosk shortcut: the volume rocker drives screen brightness.
+        container.setVolumeSink(this::onVolumeStep);
 
         // The dashboard replaces the old stack of hand-placed TextViews (icon,
         // title, monospaced terminal matrix, progress bar, percent line, used

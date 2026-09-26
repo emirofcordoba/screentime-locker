@@ -19,7 +19,6 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 /**
@@ -29,11 +28,17 @@ import java.util.Locale;
  * terminal table ({@code +------+}, {@code TIME TO UNLOCK MATRIX},
  * {@code USED 04:52:00 82% of limit}). That is a developer's view: it is accurate
  * but unreadable, it reflows badly, and it redraws a wall of text every second.
- * This module takes the same underlying data — the raw event strings decoded by
- * {@link KioskLogParser} — and paints a dashboard a non-technical person
- * understands at a glance. There is no ASCII, no machine timestamp and no
- * {@code key:value} anywhere in the output; even the unlock time is spoken in
- * plain language:
+ * This module takes the same underlying data and paints a dashboard a
+ * non-technical person understands at a glance. There is no ASCII, no machine
+ * timestamp and no {@code key:value} anywhere in the output; even the unlock time
+ * is spoken in plain language.
+ *
+ * <p><b>The activity log is gone.</b> The kiosk no longer narrates the engine's
+ * own diagnostic trail on the lock screen. That section is replaced by a
+ * <b>Shortcuts</b> card which documents the hardware gestures that work while the
+ * device is locked — the first being the volume rocker, which drives brightness
+ * (Volume Up = brighter, Volume Down = dimmer; see
+ * {@link LockActivity#onVolumeStep}).
  *
  * <pre>
  *   [mark] Screen Time                                   [ LOCKED ]
@@ -46,9 +51,8 @@ import java.util.Locale;
  *   [ SCREEN TIME USED ] [ DAILY LIMIT ]
  *   [ BUDGET LEFT     ] [ DISPLAY OFF ]
  *
- *   RECENT ACTIVITY                          4 events · 22:35
- *   * Lock engaged        Daily limit reached — the lock is enforced   2m ago
- *   * Navigation blocked  The kiosk consumed the Back key              6m ago
+ *   SHORTCUTS
+ *   [icon] Brightness   Volume Up brightens · Volume Down dims
  * </pre>
  *
  * <p><b>Static by construction (the zero-battery contract).</b> Battery on this
@@ -58,8 +62,8 @@ import java.util.Locale;
  * <ul>
  *   <li>The whole view tree is created <em>once</em> in the constructor. There is
  *       no inflation, no adapter and no layout work at update time.</li>
- *   <li>The activity list is a <em>fixed pool</em> of pre-built rows that are
- *       shown/hidden. Rendering N events never allocates a View.</li>
+ *   <li>The Shortcuts card is built once and never rebound, so unlike the
+ *       activity log it replaced it costs literally nothing per tick.</li>
  *   <li>{@link #bind} writes a {@link TextView} only when the string actually
  *       changed, so a redundant bind costs zero invalidations. No
  *       {@code Animation}, {@code ObjectAnimator}, {@code Choreographer} or
@@ -93,9 +97,6 @@ final class KioskDashboard extends LinearLayout {
     private static final int WARN_SOFT   = Color.parseColor("#2E2200");
     private static final int DANGER_SOFT = Color.parseColor("#2C1315");
 
-    /** Sentinel for "no tone baked into an activity dot yet". */
-    private static final int TONE_NONE = 0;
-
     /**
      * THE NO-DATA SENTINEL, and the only legal seed for a numeric read-out.
      *
@@ -109,9 +110,6 @@ final class KioskDashboard extends LinearLayout {
      * than as a zero clock.
      */
     private static final String SENTINEL = "\u2014";
-
-    /** How many activity rows exist. Fixed: the pool is allocated once. */
-    private static final int ACTIVITY_ROWS = 4;
 
     /**
      * Every wall-clock time the dashboard shows (the top lock clock, the
@@ -165,10 +163,12 @@ final class KioskDashboard extends LinearLayout {
     private TextView tileLeftValue;
     private TextView tileGuardValue;
 
-    // ---- activity ----
-    private TextView activityCount;
-    private TextView activityEmpty;
-    private final ActivityRow[] rows = new ActivityRow[ACTIVITY_ROWS];
+    // ---- shortcuts ----
+    //
+    // The Shortcuts card is entirely static: it is built once in
+    // buildShortcutsCard() and is never touched by bind(). Unlike the activity
+    // log it replaced, it therefore holds no per-tick state — there is no row
+    // pool to show/hide, no count stamp, and nothing here for bind() to update.
 
     KioskDashboard(Context c) {
         this(c, null, 0);
@@ -198,7 +198,7 @@ final class KioskDashboard extends LinearLayout {
         addView(buildHeroCard());
         addView(buildTileGrid());
         addView(buildBrightnessCard());
-        addView(buildActivityCard());
+        addView(buildShortcutsCard());
         addView(buildFooter());
     }
 
@@ -532,7 +532,22 @@ final class KioskDashboard extends LinearLayout {
         setIfChanged(brightValue, pct < 0 ? "--" : pct + "%");
     }
 
-    private View buildActivityCard() {
+    /**
+     * The Shortcuts card — the section that replaces the old RECENT ACTIVITY log.
+     *
+     * <p>Rather than narrating the engine's private diagnostic trail, it documents
+     * the hardware gestures the person holding the locked phone can actually use.
+     * The first shortcut is the volume rocker, which drives panel brightness
+     * (Volume Up = brighter, Volume Down = dimmer); the gesture is serviced in
+     * {@link LockActivity#onVolumeStep}.</p>
+     *
+     * <p><b>Static by construction.</b> Like every other part of this dashboard
+     * the card is built exactly once here and is never touched by
+     * {@link #bind}, so documenting a shortcut adds nothing to the per-second
+     * cost. Adding a future shortcut is a single {@link #addShortcut} call: no
+     * state, no row pool and no timer are involved.</p>
+     */
+    private View buildShortcutsCard() {
         LinearLayout card = new LinearLayout(getContext());
         card.setOrientation(VERTICAL);
         card.setBackground(rounded(CARD, 20, BORDER, 1));
@@ -542,29 +557,75 @@ final class KioskDashboard extends LinearLayout {
         clp.topMargin = dp(12);
         card.setLayoutParams(clp);
 
-        LinearLayout head = new LinearLayout(getContext());
-        head.setOrientation(HORIZONTAL);
-        head.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView title = text("RECENT ACTIVITY", 11, ACCENT, Typeface.BOLD);
+        TextView title = text("SHORTCUTS", 11, ACCENT, Typeface.BOLD);
         title.setLetterSpacing(0.14f);
-        title.setLayoutParams(new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        head.addView(title);
+        card.addView(title);
 
-        activityCount = text("", 11, FAINT, Typeface.NORMAL);
-        activityCount.setGravity(Gravity.RIGHT);
-        head.addView(activityCount);
-        card.addView(head);
+        // First shortcut: the hardware volume rocker sets the brightness.
+        addShortcut(card, "\u2600", "Brightness",
+                "Volume Up brightens  \u00b7  Volume Down dims");
 
-        activityEmpty = text("No kiosk activity recorded yet.", 12.5f, FAINT, Typeface.NORMAL);
-        activityEmpty.setPadding(0, dp(14), 0, dp(6));
-        card.addView(activityEmpty);
-
-        for (int i = 0; i < ACTIVITY_ROWS; i++) {
-            rows[i] = new ActivityRow();
-            card.addView(rows[i].container);
-        }
         return card;
+    }
+
+    /**
+     * One shortcut line: a leading glyph, a bold action name and a plain-language
+     * description of the gesture. Purely additive — a future shortcut is one more
+     * call, and nothing here participates in the 1 Hz render path.
+     */
+    private void addShortcut(LinearLayout card, String glyph, String name, String detail) {
+        LinearLayout row = new LinearLayout(getContext());
+        row.setOrientation(HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rlp.topMargin = dp(12);
+        row.setLayoutParams(rlp);
+
+        TextView icon = text(glyph, 16, ACCENT, Typeface.BOLD);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(rounded(ACCENT_SOFT, 12, BORDER, 1));
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(38), dp(38));
+        ilp.rightMargin = dp(14);
+        icon.setLayoutParams(ilp);
+        row.addView(icon);
+
+        LinearLayout body = new LinearLayout(getContext());
+        body.setOrientation(VERTICAL);
+        body.setLayoutParams(new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        body.addView(text(name, 14, TXT, Typeface.BOLD));
+        TextView sub = text(detail, 12, MUTED, Typeface.NORMAL);
+        sub.setPadding(0, dp(2), 0, 0);
+        body.addView(sub);
+        row.addView(body);
+
+        card.addView(row);
+    }
+
+    /**
+     * Reflect a brightness change that originated <em>outside</em> the slider —
+     * the volume-rocker shortcut ({@link LockActivity#onVolumeStep}). It nudges
+     * the on-screen slider and the percentage on the same frame as the key, so
+     * the read-out never waits for the next 1 Hz tick and never lags the press.
+     *
+     * <p>Guarded like {@link #renderBrightness}: the seek bar is left alone while
+     * the user is dragging it, and the programmatic switch update is flagged so it
+     * is treated as a sync rather than echoed back as a second settings write.
+     */
+    void showBrightnessLevel(int level) {
+        if (brightSeek == null || level < 0) return;
+        int clamped = Math.max(0, Math.min(Brightness.MAX, level));
+        if (!brightSeek.isPressed() && brightSeek.getProgress() != clamped) {
+            brightSeek.setProgress(clamped);
+        }
+        // A manual level leaves auto mode by definition; keep the switch honest
+        // without firing its listener as a real tap.
+        if (autoToggle != null && autoToggle.isChecked()) {
+            syncingBrightness = true;
+            autoToggle.setChecked(false);
+            syncingBrightness = false;
+        }
+        updateBrightnessLabel();
     }
 
     private View buildFooter() {
@@ -575,89 +636,6 @@ final class KioskDashboard extends LinearLayout {
         foot.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
         return foot;
-    }
-
-    /**
-     * One pre-built activity row. Created once, then only ever re-texted and
-     * shown/hidden, so updating the list costs no allocation and no inflation.
-     */
-    private final class ActivityRow {
-        final LinearLayout container;
-        final View dot;
-        final TextView title;
-        final TextView detail;
-        final TextView time;
-        /** Tone currently painted on the dot; {@link #TONE_NONE} until first show. */
-        int dotBaked = TONE_NONE;
-
-        ActivityRow() {
-            container = new LinearLayout(getContext());
-            container.setOrientation(VERTICAL);
-            container.setVisibility(View.GONE);
-
-            LinearLayout line = new LinearLayout(getContext());
-            line.setOrientation(HORIZONTAL);
-            line.setPadding(0, dp(11), 0, dp(11));
-
-            dot = new View(getContext());
-            GradientDrawable circle = new GradientDrawable();
-            circle.setShape(GradientDrawable.OVAL);
-            circle.setColor(FAINT);
-            dot.setBackground(circle);
-            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(9), dp(9));
-            dlp.rightMargin = dp(12);
-            dlp.topMargin = dp(5);
-            dot.setLayoutParams(dlp);
-            line.addView(dot);
-
-            LinearLayout body = new LinearLayout(getContext());
-            body.setOrientation(VERTICAL);
-            body.setLayoutParams(new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-            title = text("—", 14, TXT, Typeface.BOLD);
-            title.setMaxLines(1);
-            body.addView(title);
-
-            detail = text("", 12, MUTED, Typeface.NORMAL);
-            detail.setMaxLines(2);
-            detail.setPadding(0, dp(2), 0, 0);
-            body.addView(detail);
-
-            line.addView(body);
-
-            time = text("", 11, FAINT, Typeface.NORMAL);
-            time.setGravity(Gravity.RIGHT);
-            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            tlp.leftMargin = dp(10);
-            time.setLayoutParams(tlp);
-            line.addView(time);
-
-            container.addView(line);
-
-            View divider = new View(getContext());
-            divider.setBackgroundColor(BORDER);
-            divider.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
-            container.addView(divider);
-        }
-
-        void show(KioskLogEvent e, long nowMs) {
-            setIfChanged(title, e.title);
-            setIfChanged(detail, e.detail);
-            setIfChanged(time, KioskSnapshot.relative(e.atMs, nowMs));
-            int tone = toneColor(e.tone);
-            if (dotBaked != tone) {
-                dotBaked = tone;
-                ((GradientDrawable) dot.getBackground()).setColor(tone);
-            }
-            if (container.getVisibility() != View.VISIBLE) {
-                container.setVisibility(View.VISIBLE);
-            }
-        }
-
-        void hide() {
-            container.setVisibility(View.GONE);
-        }
     }
 
     // =====================================================================
@@ -731,22 +709,9 @@ final class KioskDashboard extends LinearLayout {
                 ? KioskSnapshot.shortDuration(s.budgetLeftMs()) : SENTINEL);
         setIfChanged(tileGuardValue, guardLabel(s.guardSeconds));
 
-        // ---- activity ----
-        List<KioskLogEvent> events = s.events;
-        int shown = 0;
-        for (int i = 0; i < ACTIVITY_ROWS; i++) {
-            if (i < events.size() && events.get(i) != null) {
-                rows[i].show(events.get(i), s.nowMs);
-                shown++;
-            } else {
-                rows[i].hide();
-            }
-        }
-        activityEmpty.setVisibility(shown == 0 ? View.VISIBLE : View.GONE);
-        setIfChanged(activityCount, shown == 0
-                ? ""
-                : shown + (shown == 1 ? " event" : " events")
-                        + " \u00b7 " + wallFmt().format(new Date(s.nowMs)));
+        // The SHORTCUTS card below the tiles is static: it carries no bound
+        // state, so there is nothing to paint here. The activity log that used
+        // to be driven from this point has been removed entirely.
     }
 
     // =====================================================================
@@ -893,16 +858,6 @@ final class KioskDashboard extends LinearLayout {
         if (guardSeconds < 0) return "Off";
         if (guardSeconds <= 0) return "Now";
         return guardSeconds + "s";
-    }
-
-    private static int toneColor(KioskLogEvent.Tone tone) {
-        switch (tone) {
-            case GOOD:   return GOOD;
-            case WARN:   return WARN;
-            case DANGER: return DANGER;
-            case ACCENT: return ACCENT;
-            default:     return FAINT;
-        }
     }
 
     private TextView text(String value, float spSize, int color, int style) {

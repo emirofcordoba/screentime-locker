@@ -23,6 +23,20 @@ final class Brightness {
     /** {@link Settings.System#SCREEN_BRIGHTNESS} runs 0..255 on Android. */
     static final int MAX = 255;
 
+    /**
+     * Granularity of one manual step (the volume-rocker shortcut moves by this).
+     * 10/255 is about 4% of full scale, so a full sweep is ~25 presses and a
+     * single press is a small, predictable nudge rather than a jump.
+     */
+    static final int STEP = 10;
+
+    /**
+     * Lowest level the kiosk will ever write. 0 would blank the panel entirely,
+     * which on many vendor HALs looks identical to a dead device, so a single
+     * rocker press can dim the screen but never black it out.
+     */
+    static final int MIN_LEVEL = 1;
+
     private Brightness() {}
 
     /** True when the panel is in adaptive (auto) brightness mode. */

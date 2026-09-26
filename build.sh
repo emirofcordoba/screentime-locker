@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # =============================================================================
 #  Screen Time Locker — fully automated, standalone APK build
 # =============================================================================
@@ -6,8 +6,8 @@
 #  the Android SDK command-line tools. No Gradle, no Android Studio.
 #
 #  Pipeline:
-#      aapt2 compile -> aapt2 link -> javac -> kotlinc -> d8 -> zip(dex)
-#          -> zipalign -> apksigner
+#      aapt2 compile -> aapt2 link -> javac -> kotlinc -> strip(class attrs)
+#          -> d8 -> zip(dex) -> zipalign -> apksigner
 #
 #  SELF-PROVISIONING
 #  -----------------
@@ -27,12 +27,40 @@
 #      $TIMELOCK_TOOLCHAIN_DIR  (default ~/.cache/screentime-locker)
 #  so subsequent builds are offline and instant.
 #
+#  D8 / DEX HARDENING
+#  ------------------
+#  javac annotates the synthetic parameters of enum and inner-class
+#  constructors with a `MethodParameters` attribute (JVMS 4.7.24). R8/D8 builds
+#  older than ~4.x -- notably the ones shipped by Termux and Debian -- abort
+#  while parsing it:
+#      NullPointerException: Cannot invoke "String.length()" because "<parameter1>" is null
+#  A dex file carries no parameter names, so build.sh strips every
+#  MethodParameters attribute from the compiled classes just before dexing.
+#  That is lossless and lets *any* d8 version succeed. Independently, when no
+#  usable d8 can be found anywhere, the script downloads a self-contained,
+#  architecture-independent R8 jar and runs its D8 entry point through the JDK
+#  (works on x86_64, aarch64 and Termux alike).
+#
+#  Three layers guarantee dexing never stalls the build:
+#      1. MethodParameters is stripped from every compiled class before dexing;
+#      2. a d8 whose R8 major version is < 4 is auto-upgraded to a downloaded
+#         modern R8 (the strip is impossible without python, so this covers
+#         hosts that have no python and cannot install one);
+#      3. whatever d8 is in use, if the dex step fails the script retries the
+#         exact same inputs with the portable R8 jar -- so a broken, ancient or
+#         otherwise unusable system d8 can never stop the build.
+#
 #  ENVIRONMENTS
 #  ------------
 #  Tested logic targets any Linux userland: plain Ubuntu/Debian, Fedora/RHEL,
-#  Arch, openSUSE, Alpine and Android/Termux. Termux is handled natively: the
-#  script detects $PREFIX, installs android tools with `pkg`, and uses a pure
-#  Python zipalign fallback (Termux has no zipalign package).
+#  Arch, openSUSE, Alpine, Parrot and Android/Termux. It runs identically as
+#  `./build.sh`, `sh build.sh` or `bash build.sh`: the file starts under POSIX
+#  /bin/sh and re-execs itself under bash (installing bash first if needed), so
+#  it works even on a bare BusyBox/dash/mksh/ash userland that ships no bash at
+#  all. Everything is fetched with only default commands (curl or wget, tar,
+#  unzip, a package manager) -- no GNU-only tooling is assumed. Termux is handled
+#  natively: the script detects $PREFIX, installs android tools with `pkg`, and
+#  uses a pure Python zipalign fallback (Termux has no zipalign package).
 #
 #  SIGNING
 #  -------
@@ -69,10 +97,66 @@
 #      AAPT2_BIN D8_BIN ZIPALIGN_BIN APKSIGNER_BIN ANDROID_JAR
 #                                       pin individual tools explicitly
 #      TIMELOCK_TOOLCHAIN_DIR           download cache location
+#      R8_VERSION                       R8/D8 jar version to fetch (def. 8.2.42)
+#      PYTHON                           python interpreter to use for fallbacks
 #      AUTO_INSTALL                     0 to disable all auto-provisioning
 #      OUT_NAME                         output apk file name
 #      VERSION_NAME / VERSION_CODE      per-variant version override
 # =============================================================================
+
+# ---------------------------------------------------------------------------
+#  BASH BOOTSTRAP (POSIX sh)
+# ---------------------------------------------------------------------------
+#  The build itself is written for bash, but this file is deliberately launched
+#  through /bin/sh so it starts anywhere -- even a bare Alpine, BusyBox, dash,
+#  Termux, Parrot or Android/mksh userland that ships no bash at all. When the
+#  interpreter running us is not bash we re-exec the whole script under bash,
+#  installing bash first with whichever package manager is present. Running any
+#  of `./build.sh`, `sh build.sh` or `bash build.sh` therefore behaves the same
+#  everywhere. Set AUTO_INSTALL=0 to forbid even this bootstrap install.
+if [ -z "${BASH_VERSION:-}" ]; then
+  _tl_self="$0"
+  # Resolve $0 through PATH so `build.sh` (found on PATH, not ./build.sh) still
+  # re-execs the real file rather than a same-named entry in the current dir.
+  if [ ! -f "$_tl_self" ] && command -v "$_tl_self" >/dev/null 2>&1; then
+    _tl_self="$(command -v "$_tl_self")"
+  fi
+  _tl_have_bash() { command -v bash >/dev/null 2>&1; }
+  _tl_sudo=""
+  if [ "$(id -u 2>/dev/null || echo 1)" != 0 ] && command -v sudo >/dev/null 2>&1; then
+    _tl_sudo="sudo -n"
+  fi
+  if ! _tl_have_bash && [ "${AUTO_INSTALL:-1}" != 0 ]; then
+    if [ -n "${PREFIX:-}" ] && command -v pkg >/dev/null 2>&1; then
+      pkg install -y bash >/dev/null 2>&1 || true
+    elif command -v apk >/dev/null 2>&1; then
+      $_tl_sudo apk add --no-cache bash >/dev/null 2>&1 || true
+    elif command -v apt-get >/dev/null 2>&1; then
+      DEBIAN_FRONTEND=noninteractive $_tl_sudo apt-get install -y bash >/dev/null 2>&1 || true
+    elif command -v dnf >/dev/null 2>&1; then
+      $_tl_sudo dnf install -y bash >/dev/null 2>&1 || true
+    elif command -v yum >/dev/null 2>&1; then
+      $_tl_sudo yum install -y bash >/dev/null 2>&1 || true
+    elif command -v pacman >/dev/null 2>&1; then
+      $_tl_sudo pacman -S --noconfirm --needed bash >/dev/null 2>&1 || true
+    elif command -v zypper >/dev/null 2>&1; then
+      $_tl_sudo zypper --non-interactive install bash >/dev/null 2>&1 || true
+    fi
+    hash -r 2>/dev/null || true
+  fi
+  if _tl_have_bash && [ -f "$_tl_self" ]; then
+    exec bash "$_tl_self" "$@"
+  fi
+  printf '%s\n' \
+    "ERROR: build.sh needs bash, and it could not be found or installed." \
+    "Install bash and re-run, for example:" \
+    "    Alpine : apk add bash" \
+    "    Termux : pkg install bash" \
+    "    Debian : apt-get install bash" \
+    "or invoke it explicitly:  bash build.sh" >&2
+  exit 1
+fi
+
 set -euo pipefail
 
 # ----- presentation ----------------------------------------------------------
@@ -86,9 +170,27 @@ info() { printf '    %s\n' "$*"; }
 warn() { printf '%swarn: %s%s\n' "$C_YEL" "$*" "$C_OFF" >&2; }
 die()  { printf '%sERROR: %s%s\n' "$C_RED" "$*" "$C_OFF" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+have_python() { { [ -n "${PYTHON:-}" ] && [ -x "${PYTHON:-}" ]; } && return 0; have python3 || have python; }
+# Version-sort, tolerating minimal `sort` builds (some BusyBox/dash userlands)
+# that do not implement -V. Used to pick the newest build-tools / platform.
+sortv() { sort -V 2>/dev/null || sort; }
+# Run Python with whichever interpreter is actually present (python3 or python),
+# honouring an explicit $PYTHON. Returns 127 when there is no Python at all.
+pyrun() {
+  if [ -n "${PYTHON:-}" ] && [ -x "${PYTHON:-}" ]; then "$PYTHON" "$@"
+  elif have python3; then python3 "$@"
+  elif have python; then python "$@"
+  else return 127; fi
+}
+# Resolve the java launcher, preferring the JDK we (may have) provisioned.
+java_bin() {
+  if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then echo "$JAVA_HOME/bin/java"; return 0; fi
+  command -v java
+}
 
 usage() {
-  sed -n '2,90p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  # print the whole leading comment block (everything above the first code line)
+  awk 'NR==1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "${BASH_SOURCE[0]}"
   exit 0
 }
 case "${1:-}" in
@@ -143,28 +245,52 @@ mkdir -p "$TOOLCHAIN_DIR" 2>/dev/null || { TOOLCHAIN_DIR="$ROOT/.toolchain"; mkd
 #  Generic helpers: download / extract / zip
 # =============================================================================
 
-# fetch <url> <dest> — cached, tries curl -> wget -> python3. Returns 0 on ok.
+# fetch <url> <dest> — cached. Tries curl, then wget, then python. If every
+# available downloader fails (e.g. a BusyBox wget built without TLS, or none is
+# present at all) it provisions curl through the package manager and retries
+# once. Returns 0 only once a non-empty file has been produced.
 fetch() {
   local url="$1" dest="$2" tmp="$2.part"
   if [ -s "$dest" ]; then info "cached   : $dest"; return 0; fi
   mkdir -p "$(dirname "$dest")"
   rm -f "$tmp"
   info "download : $url"
-  if have curl; then
-    curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 -o "$tmp" "$url" >/dev/null 2>&1 || { rm -f "$tmp"; return 1; }
-  elif have wget; then
-    wget -q --tries=3 --timeout=30 -O "$tmp" "$url" >/dev/null 2>&1 || { rm -f "$tmp"; return 1; }
-  elif have python3; then
-    python3 - "$url" "$tmp" <<'PY' || { rm -f "$tmp"; return 1; }
-import sys, urllib.request
-urllib.request.urlretrieve(sys.argv[1], sys.argv[2])
-PY
-  else
-    warn "no downloader available (need curl, wget or python3)"
-    return 1
+  if fetch_once "$url" "$tmp"; then mv -f "$tmp" "$dest"; return 0; fi
+  rm -f "$tmp"
+  if [ "$AUTO_INSTALL" = 1 ] && [ "$PM" != none ] && ! have curl; then
+    info "no working downloader — provisioning curl"
+    ensure_curl || true
+    if fetch_once "$url" "$tmp"; then mv -f "$tmp" "$dest"; return 0; fi
+    rm -f "$tmp"
   fi
-  mv -f "$tmp" "$dest"
-  return 0
+  warn "download failed: $url"
+  return 1
+}
+
+# fetch_once <url> <out> — a single download attempt across every tool present.
+fetch_once() {
+  local url="$1" out="$2"
+  rm -f "$out"
+  if have curl; then
+    if curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 -o "$out" "$url" >/dev/null 2>&1 && [ -s "$out" ]; then return 0; fi
+    rm -f "$out"
+  fi
+  if have wget; then
+    if wget -q --tries=3 --timeout=30 -O "$out" "$url" >/dev/null 2>&1 && [ -s "$out" ]; then return 0; fi
+    rm -f "$out"
+  fi
+  if have_python; then
+    if pyrun - "$url" "$out" <<'PY' >/dev/null 2>&1 && [ -s "$out" ]; then return 0; fi
+import sys
+try:
+    from urllib.request import urlretrieve
+except ImportError:                      # Python 2
+    from urllib import urlretrieve
+urlretrieve(sys.argv[1], sys.argv[2])
+PY
+    rm -f "$out"
+  fi
+  return 1
 }
 
 # extract_zip <zip> <destdir> — unzip -> python3 -> jar.
@@ -174,8 +300,8 @@ extract_zip() {
   if have unzip; then
     unzip -q -o "$z" -d "$d" && return 0
   fi
-  if have python3; then
-    python3 - "$z" "$d" <<'PY' && return 0
+  if have_python; then
+    pyrun - "$z" "$d" <<'PY' && return 0
 import sys, zipfile
 with zipfile.ZipFile(sys.argv[1]) as zf:
     zf.extractall(sys.argv[2])
@@ -195,8 +321,8 @@ extract_tar() {
   if have tar; then
     tar -xf "$t" -C "$d" && return 0
   fi
-  if have python3; then
-    python3 - "$t" "$d" <<'PY' && return 0
+  if have_python; then
+    pyrun - "$t" "$d" <<'PY' && return 0
 import sys, tarfile
 with tarfile.open(sys.argv[1]) as tf:
     tf.extractall(sys.argv[2])
@@ -214,8 +340,8 @@ zip_add() {
   if have zip; then
     ( cd "$dir" && zip -j -X -q "$a" "$base" ) && return 0
   fi
-  if have python3; then
-    python3 - "$a" "$f" <<'PY' && return 0
+  if have_python; then
+    pyrun - "$a" "$f" <<'PY' && return 0
 import sys, os, zipfile
 arc, src = sys.argv[1], sys.argv[2]
 with zipfile.ZipFile(arc, 'a', zipfile.ZIP_DEFLATED) as zf:
@@ -227,6 +353,321 @@ PY
   fi
   warn "cannot add $base to $a (need zip, python3 or jar)"
   return 1
+}
+
+# =============================================================================
+#  Python (portability fallbacks + class post-processing)
+# =============================================================================
+PYTHON="${PYTHON:-}"
+[ -z "$PYTHON" ] && PYTHON="$(command -v python3 || command -v python || true)"
+
+ensure_python() {
+  [ -n "$PYTHON" ] && return 0
+  case "$PM" in
+    termux)  try_pkgs python || true ;;
+    apt)     try_pkgs python3 python-minimal || true ;;
+    dnf|yum) try_pkgs python3 || true ;;
+    pacman)  try_pkgs python || true ;;
+    zypper)  try_pkgs python3 || true ;;
+    apk)     try_pkgs python3 || true ;;
+  esac
+  hash -r 2>/dev/null || true
+  PYTHON="$(command -v python3 || command -v python || true)"
+  [ -n "$PYTHON" ]
+}
+
+# strip_method_parameters <classes-dir-or-file>...
+# Remove the MethodParameters attribute (JVMS 4.7.24) from compiled classes.
+# javac writes it for the synthetic/mandated parameters of enum constructors and
+# of inner / anonymous class constructors. Old R8/D8 builds (<= 3.3.x, e.g. the
+# Termux and Debian packages) crash while reading that attribute with
+#     NullPointerException: Cannot invoke "String.length()" because "<parameter1>" is null
+# Dex keeps no parameter names, so dropping the attribute is lossless and lets
+# even an ancient system d8 produce a correct classes.dex.
+strip_method_parameters() {
+  [ "$#" -gt 0 ] || return 0
+  # Preferred: the Python stripper (fast). Only when Python is genuinely absent
+  # or fails do we fall back to the JDK-based stripper below, so a host with no
+  # Python (a minimal container, a stripped Termux, ...) still never stalls on an
+  # ancient d8.
+  if [ -z "$PYTHON" ]; then ensure_python || true; fi
+  if [ -n "$PYTHON" ]; then
+    if "$PYTHON" - "$@" <<'PY'
+import os
+import struct
+import sys
+
+FIXED_CP_TAGS = {7, 8, 16, 19, 20}          # Class, String, MethodType, Module, Package
+HANDLE_TAGS = {15}                          # MethodHandle
+FIVE_BYTE_TAGS = {3, 4, 9, 10, 11, 12, 17, 18}
+LONG_TAGS = {5, 6}                          # Long, Double (two cp slots)
+
+
+def parse_cp(buf, off):
+    count = struct.unpack_from('>H', buf, off)[0]
+    off += 2
+    entries = [None] * count
+    i = 1
+    while i < count:
+        tag = buf[off]
+        if tag == 1:
+            ln = struct.unpack_from('>H', buf, off + 1)[0]
+            entries[i] = buf[off + 3:off + 3 + ln].decode('utf-8', 'replace')
+            off += 3 + ln
+        elif tag in FIXED_CP_TAGS:
+            off += 3
+        elif tag in HANDLE_TAGS:
+            off += 4
+        elif tag in FIVE_BYTE_TAGS:
+            off += 5
+        elif tag in LONG_TAGS:
+            off += 9
+            i += 1
+        else:
+            raise ValueError('bad constant pool tag %d' % tag)
+        i += 1
+    return entries, off
+
+
+def emit_attrs(buf, off, drop, out):
+    n = struct.unpack_from('>H', buf, off)[0]
+    off += 2
+    kept = bytearray()
+    kept_n = 0
+    for _ in range(n):
+        nb, ln = struct.unpack_from('>HI', buf, off)
+        total = 6 + ln
+        if nb != drop:
+            kept += buf[off:off + total]
+            kept_n += 1
+        off += total
+    out += struct.pack('>H', kept_n)
+    out += kept
+    return off, kept_n, n
+
+
+def emit_members(buf, off, drop, out):
+    count = struct.unpack_from('>H', buf, off)[0]
+    out += buf[off:off + 2]
+    off += 2
+    removed = 0
+    for _ in range(count):
+        header = buf[off:off + 6]                 # access, name, descriptor
+        off += 6
+        body = bytearray()
+        off, kept_n, orig_n = emit_attrs(buf, off, drop, body)
+        removed += orig_n - kept_n
+        out += header
+        out += body
+    return off, removed
+
+
+def process(path):
+    with open(path, 'rb') as fh:
+        buf = fh.read()
+    if buf[:4] != b'\xca\xfe\xba\xbe':
+        return 0
+    entries, off = parse_cp(buf, 8)
+    if 'MethodParameters' not in entries:
+        return 0
+    drop = entries.index('MethodParameters')
+    out = bytearray(buf[:off])                # magic + versions + constant pool
+    out += buf[off:off + 6]                   # access, this_class, super_class
+    off += 6
+    icount = struct.unpack_from('>H', buf, off)[0]
+    out += buf[off:off + 2 + icount * 2]
+    off += 2 + icount * 2
+    removed = 0
+    for _ in range(2):                        # fields, then methods
+        off, r = emit_members(buf, off, drop, out)
+        removed += r
+    class_attrs = bytearray()
+    off, _kept, _orig = emit_attrs(buf, off, drop, class_attrs)
+    out += class_attrs
+    if off != len(buf):
+        raise ValueError('trailing bytes in %s' % path)
+    if removed:
+        with open(path, 'wb') as fh:
+            fh.write(out)
+    return removed
+
+
+def main(argv):
+    total = 0
+    for root in argv[1:]:
+        if os.path.isfile(root) and root.endswith('.class'):
+            total += process(root)
+            continue
+        for dirpath, _dirs, files in os.walk(root):
+            for name in files:
+                if name.endswith('.class'):
+                    p = os.path.join(dirpath, name)
+                    try:
+                        total += process(p)
+                    except Exception as exc:  # noqa: BLE001
+                        sys.stderr.write('warn: %s: %s\n' % (p, exc))
+    print('MethodParameters attributes stripped: %d' % total)
+    return 0
+
+
+sys.exit(main(sys.argv))
+PY
+    then
+      return 0
+    fi
+    warn "python MethodParameters strip failed — falling back to the JDK-based stripper"
+  fi
+  strip_method_parameters_java "$@"
+}
+
+# JDK-based MethodParameters stripper — no Python required. Compiles a tiny,
+# self-contained Java tool into the toolchain cache on first use and runs it.
+# javac/java are guaranteed by ensure_java, so this closes the one hole that
+# could still let a 3.x d8 abort the build on a Python-less host.
+strip_method_parameters_java() {
+  [ "$#" -gt 0 ] || return 0
+  local jc jv cache
+  jc="$(command -v javac || true)"
+  jv="$(java_bin || true)"
+  if [ -z "$jc" ] || [ -z "$jv" ]; then
+    warn "no JDK available — cannot strip MethodParameters; a 3.x d8 may fail"
+    return 0
+  fi
+  cache="$TOOLCHAIN_DIR/attrstrip"
+  mkdir -p "$cache" 2>/dev/null || return 0
+  if [ ! -s "$cache/TimelockStrip.class" ]; then
+    cat > "$cache/TimelockStrip.java" <<'JAVA'
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class TimelockStrip {
+    private static int u1(byte[] b, int o) { return b[o] & 0xff; }
+    private static int u2(byte[] b, int o) { return ((b[o] & 0xff) << 8) | (b[o + 1] & 0xff); }
+    private static long u4(byte[] b, int o) {
+        return ((long)(b[o] & 0xff) << 24) | ((b[o + 1] & 0xff) << 16)
+             | ((b[o + 2] & 0xff) << 8) | (b[o + 3] & 0xff);
+    }
+
+    private static final class Cp { String[] entries; int end; }
+
+    private static Cp parseCp(byte[] b, int off) {
+        int count = u2(b, off); off += 2;
+        Cp cp = new Cp();
+        cp.entries = new String[count];
+        for (int i = 1; i < count; i++) {
+            int tag = u1(b, off);
+            switch (tag) {
+                case 1: {
+                    int len = u2(b, off + 1);
+                    cp.entries[i] = new String(b, off + 3, len, StandardCharsets.UTF_8);
+                    off += 3 + len;
+                    break;
+                }
+                case 7: case 8: case 16: case 19: case 20: off += 3; break;
+                case 15: off += 4; break;
+                case 3: case 4: case 9: case 10: case 11: case 12: case 17: case 18: off += 5; break;
+                case 5: case 6: off += 9; i++; break;
+                default: throw new IllegalArgumentException("bad constant pool tag " + tag);
+            }
+        }
+        cp.end = off;
+        return cp;
+    }
+
+    private static int emitAttrs(byte[] b, int off, int drop, ByteArrayOutputStream out, int[] removed) {
+        int n = u2(b, off); off += 2;
+        ByteArrayOutputStream kept = new ByteArrayOutputStream();
+        int keptN = 0;
+        for (int k = 0; k < n; k++) {
+            int nb = u2(b, off);
+            long ln = u4(b, off + 2);
+            int total = 6 + (int) ln;
+            if (nb == drop) {
+                removed[0]++;
+            } else {
+                kept.write(b, off, total);
+                keptN++;
+            }
+            off += total;
+        }
+        out.write((keptN >>> 8) & 0xff);
+        out.write(keptN & 0xff);
+        byte[] kb = kept.toByteArray();
+        out.write(kb, 0, kb.length);
+        return off;
+    }
+
+    private static int emitMembers(byte[] b, int off, int drop, ByteArrayOutputStream out, int[] removed) {
+        int count = u2(b, off);
+        out.write(b, off, 2); off += 2;
+        for (int k = 0; k < count; k++) {
+            out.write(b, off, 6); off += 6;
+            off = emitAttrs(b, off, drop, out, removed);
+        }
+        return off;
+    }
+
+    private static int process(Path p) throws IOException {
+        byte[] b = Files.readAllBytes(p);
+        if (b.length < 8 || (b[0] & 0xff) != 0xca || (b[1] & 0xff) != 0xfe
+                || (b[2] & 0xff) != 0xba || (b[3] & 0xff) != 0xbe) return 0;
+        Cp cp = parseCp(b, 8);
+        int drop = -1;
+        for (int i = 1; i < cp.entries.length; i++) {
+            if ("MethodParameters".equals(cp.entries[i])) { drop = i; break; }
+        }
+        if (drop < 0) return 0;
+        int off = cp.end;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(b, 0, off);
+        out.write(b, off, 6); off += 6;
+        int icount = u2(b, off);
+        out.write(b, off, 2 + icount * 2); off += 2 + icount * 2;
+        int[] removed = new int[1];
+        off = emitMembers(b, off, drop, out, removed);
+        off = emitMembers(b, off, drop, out, removed);
+        off = emitAttrs(b, off, drop, out, removed);
+        if (off != b.length) throw new IllegalArgumentException("trailing bytes in " + p);
+        if (removed[0] > 0) Files.write(p, out.toByteArray());
+        return removed[0];
+    }
+
+    private static void walk(Path root, List<Path> out) {
+        if (Files.isRegularFile(root) && root.toString().endsWith(".class")) { out.add(root); return; }
+        if (!Files.isDirectory(root)) return;
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(root)) {
+            for (Path c : ds) {
+                if (Files.isDirectory(c)) walk(c, out);
+                else if (c.toString().endsWith(".class")) out.add(c);
+            }
+        } catch (IOException e) { }
+    }
+
+    public static void main(String[] args) throws Exception {
+        long total = 0;
+        for (String a : args) {
+            List<Path> files = new ArrayList<>();
+            walk(Paths.get(a), files);
+            for (Path p : files) {
+                try { total += process(p); }
+                catch (Exception e) { System.err.println("warn: " + p + ": " + e); }
+            }
+        }
+        System.out.println("MethodParameters attributes stripped: " + total);
+    }
+}
+JAVA
+    "$jc" -d "$cache" "$cache/TimelockStrip.java" >/dev/null 2>&1 || true
+  fi
+  if [ -s "$cache/TimelockStrip.class" ]; then
+    "$jv" -cp "$cache" TimelockStrip "$@"
+  else
+    warn "could not compile the JDK-based stripper — a 3.x d8 may fail"
+  fi
 }
 
 # =============================================================================
@@ -296,6 +737,29 @@ try_pkgs() {
     if pm_install "$p"; then info "installed package: $p"; return 0; fi
   done
   return 1
+}
+
+# Provision curl plus the CA bundle it needs for HTTPS (Alpine, minimal
+# containers and stripped userlands frequently ship neither).
+ensure_curl() {
+  have curl && return 0
+  say "provisioning curl"
+  pm_install curl ca-certificates || pm_install curl || true
+  hash -r 2>/dev/null || true
+  have curl
+}
+
+# Make sure at least one downloader exists before anything tries to fetch.
+ensure_downloader() {
+  if have curl || have wget || have_python; then return 0; fi
+  say "provisioning a downloader (curl/wget)"
+  ensure_curl || true
+  have curl && return 0
+  pm_install wget ca-certificates || pm_install wget || true
+  hash -r 2>/dev/null || true
+  if have curl || have wget || have_python; then return 0; fi
+  warn "no downloader and the package manager could not provide one — offline provisioning is limited"
+  return 0
 }
 
 # =============================================================================
@@ -430,6 +894,15 @@ APKSIGNER="${APKSIGNER_BIN:-}"
 AJD="${ANDROID_JAR:-}"
 BT=""
 
+# Remember which tools the caller pinned explicitly: an explicit *_BIN must
+# always win over anything later auto-detected (SDK build-tools, PATH, ...).
+PIN_AAPT2=0; PIN_D8=0; PIN_ZIPALIGN=0; PIN_APKSIGNER=0; PIN_AJD=0
+[ -n "${AAPT2_BIN:-}" ]     && PIN_AAPT2=1
+[ -n "${D8_BIN:-}" ]        && PIN_D8=1
+[ -n "${ZIPALIGN_BIN:-}" ]  && PIN_ZIPALIGN=1
+[ -n "${APKSIGNER_BIN:-}" ] && PIN_APKSIGNER=1
+[ -n "${ANDROID_JAR:-}" ]   && PIN_AJD=1
+
 detect_sdk() {
   local c
   [ -n "${SDK:-}" ] && return 0
@@ -449,7 +922,7 @@ pick_build_tools() {
     BT="$SDK/build-tools/$BUILD_TOOLS"; return 0
   fi
   BT="$(find "$SDK/build-tools" -maxdepth 1 -mindepth 1 -type d -name '[0-9]*' 2>/dev/null \
-        | while read -r d; do [ -x "$d/aapt2" ] && echo "$d"; done | sort -V | tail -1)"
+        | while read -r d; do [ -x "$d/aapt2" ] && echo "$d"; done | sortv | tail -1)"
   [ -n "$BT" ] && [ -x "$BT/aapt2" ]
 }
 
@@ -460,7 +933,7 @@ pick_platform() {
     AJD="$SDK/platforms/$PLATFORM_VERSION/android.jar"; return 0
   fi
   p="$(find "$SDK/platforms" -maxdepth 1 -mindepth 1 -type d 2>/dev/null \
-       | grep -E '/android-[0-9]+$' | sort -V | tail -1)"
+       | grep -E '/android-[0-9]+$' | sortv | tail -1)"
   [ -n "$p" ] && [ -f "$p/android.jar" ] && { AJD="$p/android.jar"; return 0; }
   return 1
 }
@@ -514,6 +987,40 @@ provision_platform() {
   return 1
 }
 
+# Portable, architecture-independent d8: download a self-contained R8 jar and
+# expose its D8 entry point as a launcher. Needed when no build-tools/SDK d8 is
+# available at all (e.g. Termux on aarch64). Pure Java -> runs wherever a JDK is.
+R8_VERSION="${R8_VERSION:-8.2.42}"
+provision_r8() {
+  [ "$AUTO_INSTALL" = 1 ] || return 1
+  java_bin >/dev/null 2>&1 || return 1
+  local jar="$TOOLCHAIN_DIR/r8-$R8_VERSION.jar"
+  local url="https://maven.google.com/com/android/tools/r8/$R8_VERSION/r8-$R8_VERSION.jar"
+  fetch "$url" "$jar" || return 1
+  local w="$TOOLCHAIN_DIR/d8-$R8_VERSION"
+  {
+    printf '#!/bin/sh\n'
+    printf 'exec "%s" -cp "%s" com.android.tools.r8.D8 "$@"\n' "$(java_bin)" "$jar"
+  } > "$w"
+  chmod +x "$w" 2>/dev/null || true
+  D8="$w"
+  info "using downloaded R8/D8 $R8_VERSION ($jar)"
+  return 0
+}
+
+# Echo the R8/D8 MAJOR version of a d8 binary (3 for 3.3.28, 8 for 8.2.42).
+# Prints nothing (returns non-zero) when it cannot be determined, in which case
+# the caller treats the d8 as "good enough". R8 builds with major < 4 are the
+# ones that abort on classes carrying parameter-name info (e.g. the Termux and
+# Debian packages), so they are worth replacing when a modern R8 is obtainable.
+d8_major() {
+  local line v
+  line="$("$1" --version 2>&1 | head -n1 || true)"
+  v="$(printf '%s\n' "$line" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1 || true)"
+  [ -n "$v" ] || return 1
+  printf '%s' "${v%%.*}"
+}
+
 install_android_tools_via_pm() {
   # Termux provides aapt2/apksigner/d8 as native packages; other distros expose
   # the SDK pieces under a few different names. Best effort, all failures soft.
@@ -537,12 +1044,13 @@ resolve_android() {
   [ -z "$ZIPALIGN" ]  && ZIPALIGN="$(command -v zipalign || true)"
   [ -z "$APKSIGNER" ] && APKSIGNER="$(command -v apksigner || true)"
 
-  # 3. under an SDK, prefer its build-tools binaries for version consistency
+  # 3. under an SDK, prefer its build-tools binaries for version consistency,
+  #    but never clobber a tool the caller pinned explicitly via *_BIN.
   if [ -n "$BT" ]; then
-    [ -x "$BT/aapt2" ]     && AAPT2="$BT/aapt2"
-    [ -f "$BT/d8" ]        && D8="$BT/d8"
-    [ -x "$BT/zipalign" ]  && ZIPALIGN="$BT/zipalign"
-    [ -f "$BT/apksigner" ] && APKSIGNER="$BT/apksigner"
+    if [ "$PIN_AAPT2" != 1 ] && [ -x "$BT/aapt2" ]; then AAPT2="$BT/aapt2"; fi
+    if [ "$PIN_D8" != 1 ] && [ -f "$BT/d8" ]; then D8="$BT/d8"; fi
+    if [ "$PIN_ZIPALIGN" != 1 ] && [ -x "$BT/zipalign" ]; then ZIPALIGN="$BT/zipalign"; fi
+    if [ "$PIN_APKSIGNER" != 1 ] && [ -f "$BT/apksigner" ]; then APKSIGNER="$BT/apksigner"; fi
   fi
 
   # 4. install via the package manager
@@ -571,12 +1079,33 @@ resolve_android() {
     provision_platform || true
   fi
 
+  # 5b. universal d8 fallback / upgrade: a portable R8 jar (any arch, needs
+  #     only a JDK). Used when there is no d8 at all, and also to replace a
+  #     genuinely ancient R8 (< 4.x) that would mis-dex our classes. If the
+  #     download is unavailable we keep the existing d8: the MethodParameters
+  #     strip in step 5/7 makes even a 3.x d8 work.
+  if [ -z "$D8" ]; then
+    have java || ensure_java
+    provision_r8 || true
+  elif [ "$AUTO_INSTALL" = 1 ] && [ "$PIN_D8" != 1 ]; then
+    D8_MAJOR="$(d8_major "$D8" || true)"
+    if [ -n "$D8_MAJOR" ] && [ "$D8_MAJOR" -lt 4 ] 2>/dev/null; then
+      have java || ensure_java
+      info "system d8 looks ancient (R8 $D8_MAJOR.x) — preferring a portable R8/D8 build"
+      provision_r8 \
+        || warn "could not fetch a modern d8 — continuing with the ancient system d8 (MethodParameters will be stripped)"
+    fi
+  fi
+
   # 6. last resort for zipalign: a pure-Python aligner (used on Termux etc.)
-  if [ -z "$ZIPALIGN" ] && have python3; then
+  if [ -z "$ZIPALIGN" ] && [ -n "$PYTHON" ]; then
     ZIPALIGN="$TOOLCHAIN_DIR/zipalign.py"
     if [ ! -s "$ZIPALIGN" ]; then
-      cat > "$ZIPALIGN" <<'PY'
-#!/usr/bin/env python3
+      # shebang points at whichever interpreter we actually resolved (python3 or
+      # plain python), so this works on hosts that only ship the latter.
+      {
+        printf '#!%s\n' "$PYTHON"
+        cat <<'PY'
 """Pure-Python zipalign fallback for hosts without the Android zipalign.
 
 Rewrites a zip so every entry's data starts on a 4-byte boundary, using a
@@ -653,6 +1182,7 @@ def main(argv):
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
 PY
+      } > "$ZIPALIGN"
       chmod +x "$ZIPALIGN" 2>/dev/null || true
     fi
   fi
@@ -741,6 +1271,7 @@ say "Screen Time Locker — automated standalone build"
 info "host         : ${ARCH}$( [ "$IS_TERMUX" = 1 ] && printf ' (Termux)' ) | pkg-manager: $PM | auto-install: $AUTO_INSTALL"
 info "toolchain dir: $TOOLCHAIN_DIR"
 
+ensure_downloader
 ensure_java
 ensure_kotlin
 resolve_android
@@ -801,12 +1332,37 @@ say "[4/7] kotlinc (kotlin/ tree)"
   $(find "$ROOT/kotlin" -name '*.kt')
 
 # ---- [5/7] dex --------------------------------------------------------------
+# Drop the MethodParameters attribute javac writes for enum / inner-class
+# constructors; this is what stops ancient Termux/Debian d8 builds (R8 <= 3.3.x)
+# from aborting with a NullPointerException. A no-op for modern d8. If the
+# resolved d8 still fails for any reason, the exact same inputs are re-dexed with
+# the portable R8 jar, so a broken, ancient or otherwise unusable system d8 can
+# never stop the build.
+dex_into() {
+  local out="$1" inputs
+  inputs="$(find "$WORK/classes" -name '*.class')"
+  # shellcheck disable=SC2086
+  if "$D8" --release --min-api "$MIN_API" --lib "$AJD" --output "$out" $inputs $LIBINPUTS; then
+    return 0
+  fi
+  warn "d8 ($D8) failed — retrying with a portable R8/D8 build"
+  rm -rf "$out"; mkdir -p "$out"
+  have java || ensure_java
+  if provision_r8; then
+    # shellcheck disable=SC2086
+    if "$D8" --release --min-api "$MIN_API" --lib "$AJD" --output "$out" $inputs $LIBINPUTS; then
+      return 0
+    fi
+  else
+    warn "no modern R8/D8 could be obtained (offline?) — set D8_BIN to a working d8"
+  fi
+  return 1
+}
+
 say "[5/7] d8 (dex java + kotlin + bundled libs)"
-# shellcheck disable=SC2086
-"$D8" --release --min-api "$MIN_API" --lib "$AJD" \
-  --output "$WORK/dex" \
-  $(find "$WORK/classes" -name '*.class') \
-  $LIBINPUTS
+strip_method_parameters "$WORK/classes"
+dex_into "$WORK/dex" \
+  || die "dexing failed: d8 could not compile the classes, even with the portable R8 fallback"
 zip_add "$WORK/base.apk" "$WORK/dex/classes.dex" \
   || die "failed to add classes.dex to the APK"
 
