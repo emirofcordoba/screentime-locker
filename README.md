@@ -57,6 +57,7 @@ The only way in is to wait for the window to end.
 - **Biometric-only admin door.** The console opens with `*#*#84635#*#*` plus a fingerprint. Nothing is stored, so there is nothing to steal.
 - **Sealed after setup.** Once confirmed, the settings lock themselves and the app hides from your launcher.
 - **Zero-cost idle.** No wake locks and no polling. Timers are passive alarms and the platform's JobScheduler.
+- **Quiet when locked.** The moment the lock engages, background apps are stopped and mobile data and Wi-Fi are switched off; on unlock every radio is restored exactly as it was. A locked phone becomes a quiet phone.
 - **Live status-bar countdown.** Seconds remaining, drawn natively by SystemUI.
 - **On-screen brightness control.** The lock screen sets the panel level and adaptive-brightness mode from a slider and switch — device-wide, with no extra permission.
 - **Per-weekday limits.** Give each day its own budget, or switch a day off.

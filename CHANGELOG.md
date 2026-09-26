@@ -2,6 +2,19 @@
 
 Notable changes to Screen Time Locker, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and [Semantic Versioning](https://semver.org/).
 
+## 7.1 - 2026-09-26
+
+### Added
+- **Lock-mode power policy (`BatteryGuard`).** The moment the kiosk lock engages, the app makes the rest of the phone quiet so the locked screen costs as little battery as possible. Over the same privileged Shizuku shell channel the onboarding chain already uses, it runs three idempotent actions: `am kill-all` stops every background user app (so nothing left in the background keeps a wakelock, fires an alarm, runs a sync or holds the radio awake - the foreground kiosk is untouched), `svc data disable` turns mobile data off, and `svc wifi disable` turns Wi-Fi off. A locked screen cannot use the network, so every packet it would have woken for is pure drain.
+- The radio state is read **before** anything is flipped and stored, so unlocking restores exactly what the owner had: a device whose owner had data or Wi-Fi off is left off and is never silently turned on.
+
+### Changed
+- `Prefs.setLocked()` is now the single funnel for the policy: every path that changes the lock state (the service entering/leaving the lock, a window rollover handled inside the kiosk, `Engine.selfHeal` after an ownership loss) engages or releases the device-wide power policy, so it can never be left engaged on an idle device or skipped on a locked one. `BatteryGuard.sync()` is a cheap in-memory read that returns **without spawning anything** when the policy already matches the lock state, and the actual shell work rides on one short-lived daemon thread per real transition (never per tick, no timer, no alarm, no polling loop and no wakelock).
+
+### Notes
+- Everything is defensive: a missing binder, a revoked permission or a `RemoteException` degrades to one recorded note and changes nothing device-wide, and a reboot is handled (`staleSinceBoot`), so the pass re-engages after a restart because a reboot resets the radios to their defaults.
+- Version bumped from 7.0 (versionCode 32) to 7.1 (versionCode 33), signed with the maintainer private release key.
+
 ## 7.0 - 2026-09-26
 
 ### Added

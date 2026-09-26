@@ -126,12 +126,56 @@ final class Prefs {
     static void setLocked(Context c, boolean v) {
         SharedPreferences.Editor e = sp(c).edit(); e.putBoolean("locked", v); put(e);
         BootState.mirror(c);
+        // Single funnel for the device-wide power policy: every path that EVER
+        // changes the lock state (service enterLock/exitLock, a window rollover
+        // handled inside the kiosk, selfHeal after an ownership loss) comes
+        // through here, so the battery policy can never be left engaged on an
+        // idle device or skipped on a locked one. sync() is a cheap in-memory
+        // read that returns without spawning anything when the policy already
+        // matches the lock state.
+        BatteryGuard.sync(c, v);
     }
 
     static long lockUntil(Context c) { return sp(c).getLong("lock_until", 0L); }
     static void setLockUntil(Context c, long v) {
         SharedPreferences.Editor e = sp(c).edit(); e.putLong("lock_until", v); put(e);
         BootState.mirror(c);
+    }
+
+    // ---------- device-wide power policy (see BatteryGuard) ----------
+    // Durable record of whether the kiosk lock has flipped the radios off and
+    // stopped background apps, so an unlock restores exactly the owner's prior
+    // radio state (and never silently turns a radio on that was already off).
+    static boolean powerEngaged(Context c) { return sp(c).getBoolean("power_engaged", false); }
+    static long powerAt(Context c) { return sp(c).getLong("power_at", 0L); }
+    static boolean powerDataOff(Context c) { return sp(c).getBoolean("power_data_off", false); }
+    static boolean powerWifiOff(Context c) { return sp(c).getBoolean("power_wifi_off", false); }
+
+    /** Radio state the owner had BEFORE the lock flipped it, for exact restore. */
+    static void setPowerPrior(Context c, int dataPrior, int wifiPrior) {
+        SharedPreferences.Editor e = sp(c).edit();
+        e.putInt("power_data_prior", dataPrior);
+        e.putInt("power_wifi_prior", wifiPrior);
+        put(e);
+    }
+    static int powerDataPrior(Context c) { return sp(c).getInt("power_data_prior", -1); }
+    static int powerWifiPrior(Context c) { return sp(c).getInt("power_wifi_prior", -1); }
+
+    /**
+     * Record one engage/release pass. {@code engaged} is what the unlock path
+     * keys off; {@code dataOff}/{@code wifiOff} are the radios THIS app actually
+     * turned off (so a radio the owner had already disabled stays off).
+     */
+    static void setPowerEngaged(Context c, boolean engaged, boolean dataOff,
+                                boolean wifiOff, boolean apps, boolean channel, long at) {
+        SharedPreferences.Editor e = sp(c).edit();
+        e.putBoolean("power_engaged", engaged);
+        e.putBoolean("power_data_off", dataOff);
+        e.putBoolean("power_wifi_off", wifiOff);
+        e.putBoolean("power_apps", apps);
+        e.putBoolean("power_channel", channel);
+        e.putLong("power_at", at);
+        put(e);
     }
 
     // ---------- diagnostics ----------
