@@ -2,6 +2,16 @@
 
 Notable changes to Screen Time Locker, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+- **Full documentation pass.** Every Markdown file (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, `libs/README.md` and all of `docs/`) rewritten for accuracy, consistency and clarity.
+- Architecture and libs docs now reflect the classes actually shipped: `BatteryGuard`, `ShizukuHardener`, `Brightness`, `StatusActivity`, `PowerStateReceiver`, `TimeFmt`, the `KioskLog*` helpers, `SplashActivity` and `TransitionGate` are documented, and `libs/` no longer claims Shizuku is used for a single purpose.
+- Documentation cross-links, tone and formatting standardised across the set; troubleshooting lines now quote the real commands and output.
+
+### Notes
+- No code, build script, manifest or version identity changed in this pass — documentation only.
+
 ## 7.1 - 2026-09-26
 
 ### Added

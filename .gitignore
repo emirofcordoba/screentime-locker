@@ -17,6 +17,10 @@ captures/
 .DS_Store
 Thumbs.db
 
+# Secrets — the push script reads these, they must never be committed
+.github-token
+*.token
+
 # Rotated source snapshots / intermediate caches this project used to keep
 .backup-*
 /gen/

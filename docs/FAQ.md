@@ -6,7 +6,7 @@
 
 **Do I need root?** No. It uses the standard Android Device-Owner mechanism.
 
-**Do I need a computer?** Not always. With [Shizuku](https://shizuku.rikka.app/) the app grants itself Device Owner. Without it you need `adb` once.
+**Do I need a computer?** Not always. With [Shizuku](https://shizuku.rikka.app/) the app grants itself Device Owner without a PC. Without Shizuku, you need `adb` once.
 
 **Is there an iOS version?** No. The approach depends on Android's Device-Owner APIs.
 
@@ -18,7 +18,7 @@
 
 **Can I add a Google account later?** You can, but accounts can affect future provisioning and updates. For a lock you plan to keep, stay account-free.
 
-**A step won't pass.** Each step re-checks when the screen resumes. Make sure the step really succeeded, for example that the battery exemption is actually granted, then return to the app. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+**A step won't pass.** Each step re-checks when the screen resumes. Make sure the step really succeeded — for example, that the battery exemption is actually granted — then return to the app. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 **What does the secret code do?** `*#*#84635#*#*` opens the admin console. A fingerprint check still stands behind it.
 
@@ -34,25 +34,27 @@
 
 **What if I reboot during a lock?** The direct-boot receiver re-arms the lock before you unlock, so it is still there.
 
-**The status bar says "Today no lock!".** That means no limit is set yet, or you are outside a locked window. It is telling you the truth instead of a misleading `00:00:00`.
+**The status bar says "Today no lock!".** That means no limit is set yet, or you are outside a locked window. It is telling you the truth instead of showing a misleading `00:00:00`.
+
+**Does the app drain battery while locked?** No. When the lock engages it quietens the phone down: background apps are stopped and mobile data and Wi-Fi are switched off, then restored exactly as they were on unlock. Idle time uses no wake locks and no polling.
 
 ## Escape and removal
 
-There is no temporary off-switch. No timer to wait out, no unlock anyway, and once the app is Device Owner no `adb` command undoes it. The app never exposes `clearDeviceOwnerApp()`, so there is nothing for a tool to call. The single route off is a factory reset, and only if you left *Block factory reset* off.
+There is no temporary off-switch. No timer to wait out, no unlock-anyway, and once the app is Device Owner no `adb` command undoes it. The app never exposes `clearDeviceOwnerApp()`, so there is nothing for a tool to call. The single route off is a factory reset, and only if you left *Block factory reset* off.
 
 **Where is the emergency unlock?** There isn't one, on purpose. A soft lock you can dismiss at 2 a.m. is a suggestion, and suggestions lose.
 
-**How do I remove the app?** One way only, a factory reset. A normal uninstall is blocked because the app is Device Owner, and the settings are sealed after setup.
+**How do I remove the app?** One way only: a factory reset. A normal uninstall is blocked because the app is Device Owner, and the settings are sealed after setup.
 
 **Does the factory reset work only if the toggle was off?** Correct. If you enabled *Block factory reset*, that door is closed too and the only way back is to re-flash the device. Turn that on only when you are certain.
 
-**Can someone else remove it?** Not by hand. Not the owner, not a family member, not a thief. A factory reset is the only route, and only while it is not blocked.
+**Can someone else remove it?** Not by hand — not the owner, not a family member, not a thief. A factory reset is the only route, and only while it is not blocked.
 
 ## Security
 
 **Does it store my password or PIN?** No. There is no stored secret. The console uses your device biometrics.
 
-**Could malware abuse the pinned permissions?** The pinning is scoped to this app. The app deliberately avoids device-wide permission policy to keep the blast radius small.
+**Could malware abuse the pinned permissions?** The pinning is scoped to this app wherever the platform allows it. The app deliberately avoids device-wide permission policy except for the one explicit *disable app control* hardening step you opt into at setup, which keeps the blast radius small.
 
 **Is the test key in the repo a problem?** No. It is meant to be public. Just do not ship real releases with it.
 

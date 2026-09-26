@@ -17,9 +17,9 @@
 
 Screen Time Locker counts the time your screen is actually on. Once you spend your daily allowance, it takes the phone over with a real system lock that survives reboots, force-stops and the person holding it. That person is you.
 
-There is no unlock anyway button, no reset code and no PIN. You decide the rule once, on purpose, and Android enforces it after that.
+There is no *unlock anyway* button, no reset code and no PIN. You decide the rule once, on purpose, and Android enforces it after that.
 
-It works by becoming your phone's **Device Owner**, the same role a company IT department uses on the phones it manages.
+It works by becoming your phone's **Device Owner** — the same role a company IT department uses on the phones it manages.
 
 ## Screenshots
 
@@ -30,21 +30,21 @@ It works by becoming your phone's **Device Owner**, the same role a company IT d
 
 ## Why it's different
 
-Most screen-time tools are soft. They warn you, dim the screen, count your minutes, then step aside the moment you ask for five more. That comfort is why they fail.
+Most screen-time tools are soft. They warn you, dim the screen, count your minutes, then step aside the moment you ask for five more. That comfort is exactly why they fail.
 
-| | Typical screen-time app | Screen Time Locker |
+|  | Typical screen-time app | Screen Time Locker |
 |---|---|---|
 | Enforcement | Reminder banner | Device-Owner kiosk lock |
-| Removable | Any time from Settings | No, settings are sealed once set up |
+| Removable | Any time from Settings | No — settings are sealed once set up |
 | After a reboot | Often resets | Re-arms before you even unlock |
-| Unlock early | One tap | Not possible, no PIN or release code |
-| Your role | Player and referee | You set the rule, the system referees |
+| Unlock early | One tap | Not possible — no PIN, no release code |
+| Your role | Player and referee | You set the rule; the system referees |
 
 ## How it works
 
-1. You pick a limit, for example two hours of screen-on time a day, resetting at 5 a.m.
-2. Time is counted only while the screen is on. A phone in your pocket costs nothing.
-3. When the budget runs out a full-screen lock takes over. Back, Home and Recents stop working, and notifications and the status bar are disabled.
+1. You pick a limit — for example, two hours of screen-on time a day, resetting at 5 a.m.
+2. Time is counted **only while the screen is on**. A phone in your pocket costs nothing.
+3. When the budget runs out, a full-screen lock takes over. Back, Home and Recents stop working, and notifications and the status bar are disabled.
 4. At the next window it unlocks on its own. No action needed.
 5. Reboots don't help. A direct-boot receiver re-arms the guard before you type your passcode, so there is no gap to slip through.
 
@@ -53,10 +53,10 @@ The only way in is to wait for the window to end.
 ## Features
 
 - **Real Device-Owner enforcement.** A lock-task kiosk through `DevicePolicyManager`, not an overlay you can swipe away.
-- **Reboot-proof.** Direct-boot aware, re-arms pre-unlock, no OEM autostart permission needed.
+- **Reboot-proof.** Direct-boot aware; re-arms pre-unlock with no OEM autostart permission needed.
 - **Biometric-only admin door.** The console opens with `*#*#84635#*#*` plus a fingerprint. Nothing is stored, so there is nothing to steal.
 - **Sealed after setup.** Once confirmed, the settings lock themselves and the app hides from your launcher.
-- **Zero-cost idle.** No wake locks and no polling. Timers are passive alarms and the platform's JobScheduler.
+- **Zero-cost idle.** No wake locks and no polling. Timers are passive alarms plus the platform's `JobScheduler`.
 - **Quiet when locked.** The moment the lock engages, background apps are stopped and mobile data and Wi-Fi are switched off; on unlock every radio is restored exactly as it was. A locked phone becomes a quiet phone.
 - **Live status-bar countdown.** Seconds remaining, drawn natively by SystemUI.
 - **On-screen brightness control.** The lock screen sets the panel level and adaptive-brightness mode from a slider and switch — device-wide, with no extra permission.
@@ -69,7 +69,7 @@ The only way in is to wait for the window to end.
 
 - Android 8.0 (API 26) or newer.
 - A device prepared for Device Owner: factory reset it, or remove all accounts, turn off auto-sync and reboot.
-- [Shizuku](https://shizuku.rikka.app/) is optional. It lets the app claim Device Owner without a PC. Otherwise use the one `adb` command the app shows you.
+- [Shizuku](https://shizuku.rikka.app/) is optional. It lets the app claim Device Owner without a PC, and it powers the optional shell-level hardening. Without it, use the one `adb` command the app shows you.
 - A fingerprint enrolled, for the admin console.
 
 Read the in-app warning before you start. Device Owner is a system-level change, and the app will not let you continue until you have acknowledged it.
@@ -94,7 +94,7 @@ cd screentime-locker
 bash build.sh
 ```
 
-The script finds your SDK, compiles resources, Java and Kotlin, dexes everything including the bundled Shizuku client, aligns and signs. The result lands in `build/timelock-locker.apk`.
+The script finds your SDK, compiles resources, Java and Kotlin, dexes everything including the bundled Shizuku client, then aligns and signs. The result lands in `build/timelock-locker.apk`.
 
 | Variable | Meaning |
 |---|---|
@@ -122,7 +122,7 @@ screentime-locker/
 ├── AndroidManifest.xml    components, permissions, receivers, services
 ├── build.sh               one-command build, no Gradle
 ├── java/                  the engine and every screen
-├── kotlin/                Kotlin tree (onboarding, Shizuku shell)
+├── kotlin/                Kotlin tree (onboarding, Shizuku shell, admin section)
 ├── res/                   strings, colours, styles, layouts, drawables
 ├── libs/                  bundled Shizuku 13.1.5 client and provider jars
 ├── keystore/              the public test key
@@ -150,7 +150,7 @@ apksigner verify --print-certs timelock-locker.apk
 
 The repo ships a throwaway key at `keystore/timelock-test.jks` (password `testkey123`, alias `timelock-test`). It exists so a fresh clone builds an installable APK with no setup.
 
-Do not ship with it. The key is public, so anything signed with it can be impersonated. The certificate even says `CN=Screen Time Locker TEST KEY (DO NOT SHIP)`.
+Do not ship with it. The key is public, so anything signed with it can be impersonated — the certificate itself says `CN=Screen Time Locker TEST KEY (DO NOT SHIP)`.
 
 For a real release, make your own key and keep it offline:
 
@@ -163,7 +163,7 @@ Losing a signing key means you can never publish an update that Android accepts 
 
 ## Honest limits
 
-The build compiles cleanly and produces a v2 and v3 signed APK, checked with `apksigner verify`. The enforcement logic is verified by static inspection of the compiled dex and packaged manifest. It has not been exhaustively tested on a live physical device, and Device-Owner behaviour varies by manufacturer. Test on a spare device before you rely on it.
+The build compiles cleanly and produces a v2- and v3-signed APK, checked with `apksigner verify`. The enforcement logic is verified by static inspection of the compiled dex and packaged manifest. It has not been exhaustively tested on a live physical device, and Device-Owner behaviour varies by manufacturer. Test on a spare device before you rely on it.
 
 Found something wrong? See [SECURITY.md](SECURITY.md) and [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
@@ -175,9 +175,9 @@ Found something wrong? See [SECURITY.md](SECURITY.md) and [docs/TROUBLESHOOTING.
 
 **What if I need the phone in an emergency?** Then don't install this on your only phone on day one. The app is non-bypassable on purpose, so test it on a secondary device first.
 
-**Where is the unlock anyway button?** There isn't one. That is the whole design. See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md).
+**Where is the unlock-anyway button?** There isn't one. That is the whole design. See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md).
 
-**How do I remove it?** One route only: a factory reset, and only if you left the optional *Block factory reset* toggle off. There is no uninstall, no `adb` command and no in-app release once the app is Device Owner. If you turned the blocker on, the device must be re-flashed. Details in [docs/INSTALLATION.md](docs/INSTALLATION.md).
+**How do I remove it?** One route only: a factory reset — and only if you left the optional *Block factory reset* toggle off. There is no uninstall, no `adb` command and no in-app release once the app is Device Owner. If you turned the blocker on, the device must be re-flashed. Details in [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
 **The counter looks wrong.** Time only accrues while the screen is on, inside your window.
 
@@ -185,7 +185,7 @@ More questions are answered in [docs/FAQ.md](docs/FAQ.md).
 
 ## Contributing and license
 
-Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first and keep the core promise intact. Released under the [MIT License](LICENSE). The bundled Shizuku jars are © RikkaApps under Apache 2.0, see [libs/](libs/).
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first and keep the core promise intact. Released under the [MIT License](LICENSE). The bundled Shizuku jars are © RikkaApps under Apache 2.0 — see [libs/](libs/).
 
 <div align="center">
 

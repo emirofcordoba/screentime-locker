@@ -6,18 +6,18 @@
 
 Every phone ships with one, and almost nobody is helped by it. The reason is simple: it asks you to be disciplined at the exact moment you are least disciplined.
 
-The setting is soft. It nags, it dims the screen, it shows a card that says you have reached your limit. Then it offers a button: ignore, fifteen more minutes, remind me later. At 2 a.m. the tired brain that wants the phone beats the tired brain that set the limit. Comfort is what makes it useless.
+The setting is soft. It nags, it dims the screen, it shows a card that says you have reached your limit. Then it offers a button: *ignore*, *fifteen more minutes*, *remind me later*. At 2 a.m. the tired brain that wants the phone beats the tired brain that set the limit. Comfort is what makes it useless.
 
 ## The assumption
 
-The person who sets the rule and the person who breaks it are the same person, and only one of them is thinking clearly. So the choice is made once, deliberately, by the clear-headed version of you, and then enforced by a system with no opinions, no fatigue and no just this once.
+The person who sets the rule and the person who breaks it are the same person — and only one of them is thinking clearly. So the choice is made once, deliberately, by the clear-headed version of you, and then enforced by a system with no opinions, no fatigue and no *just this once*.
 
 ## What that means in practice
 
-- No temporary locks. The lock ends when the window ends, not a second sooner.
-- No soft exits. No PIN, no recovery phrase, no unlock anyway. Deliberately nothing to find, guess or social-engineer.
-- No promises you can break. Android's own Device-Owner mechanism does the enforcing, the same machinery enterprises use on devices they own.
-- It survives you. Reboots, force-stops, swiping it from recents. The lock returns before you unlock the screen.
+- **No temporary locks.** The lock ends when the window ends, not a second sooner.
+- **No soft exits.** No PIN, no recovery phrase, no unlock-anyway. Deliberately nothing to find, guess or social-engineer.
+- **No promises you can break.** Android's own Device-Owner mechanism does the enforcing — the same machinery enterprises use on devices they own.
+- **It survives you.** Reboots, force-stops, swiping it from Recents. The lock returns before you unlock the screen.
 
 ## The uncomfortable part
 
