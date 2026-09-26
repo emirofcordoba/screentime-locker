@@ -10,6 +10,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -129,6 +130,9 @@ final class KioskDashboard extends LinearLayout {
     private SimpleDateFormat clockFmt;
     private SimpleDateFormat dateFmt;
 
+    // ---- battery (top-right corner, lock-screen style) ----
+    private TextView batteryText;
+
     // ---- header ----
     private TextView statusPill;
     /** The pill state whose drawable is already installed (see {@link #setPill}). */
@@ -196,12 +200,20 @@ final class KioskDashboard extends LinearLayout {
      * contradicts the clock in the settings app.
      */
     private View buildLockClock() {
+        // A FrameLayout lets the centred clock and the top-right battery read-out
+        // share the very top of the page without either disturbing the other's
+        // layout: the clock column fills the width and centres itself, the battery
+        // pill is pinned to the top-right corner on top of it.
+        FrameLayout frame = new FrameLayout(getContext());
+        frame.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
         LinearLayout col = new LinearLayout(getContext());
         col.setOrientation(VERTICAL);
         col.setGravity(Gravity.CENTER_HORIZONTAL);
         col.setPadding(dp(4), dp(10), dp(4), dp(20));
-        col.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
+        col.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         lockClock = text("", 54, TXT, Typeface.NORMAL);
         lockClock.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
@@ -214,7 +226,25 @@ final class KioskDashboard extends LinearLayout {
         lockDate.setPadding(0, dp(8), 0, 0);
         col.addView(lockDate);
 
-        return col;
+        frame.addView(col);
+
+        // Battery: seeded empty and hidden, then painted by renderBattery() on the
+        // first bind that actually carries a level. Nothing ever flashes a "0%".
+        batteryText = text("", 13, MUTED, Typeface.BOLD);
+        batteryText.setTypeface(Ui.mono(), Typeface.BOLD);
+        batteryText.setGravity(Gravity.CENTER);
+        batteryText.setIncludeFontPadding(false);
+        batteryText.setPadding(dp(11), dp(6), dp(11), dp(6));
+        batteryText.setBackground(rounded(CARD2, 14, BORDER, 1));
+        batteryText.setVisibility(View.GONE);
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        blp.gravity = Gravity.TOP | Gravity.END;
+        blp.topMargin = dp(12);
+        blp.rightMargin = dp(6);
+        frame.addView(batteryText, blp);
+
+        return frame;
     }
 
     private View buildHeader() {
@@ -502,6 +532,9 @@ final class KioskDashboard extends LinearLayout {
         // ---- lock clock (very top) ----
         renderClock(s.nowMs);
 
+        // ---- battery (top-right corner) ----
+        renderBattery(s);
+
         // ---- status pill ----
         if (s.locked) {
             setPill("LOCKED", DANGER, DANGER_SOFT);
@@ -609,6 +642,41 @@ final class KioskDashboard extends LinearLayout {
         Date now = new Date(nowMs);
         setIfChanged(lockClock, fmt.format(now));
         setIfChanged(lockDate, dateFmt.format(now));
+    }
+
+    // =====================================================================
+    //  Battery (top-right corner)
+    // =====================================================================
+
+    /**
+     * Paint the top-right battery read-out. The pill shows "82%" (prefixed with a
+     * charging bolt while plugged in), tinted by charge level. Like every other
+     * write in {@link #bind}, the string and the colour are diffed first, so a tick
+     * that changes no charge performs no invalidation.
+     *
+     * <p>A level of -1 means "unknown" (for example a device whose battery HAL does
+     * not answer the sticky broadcast). In that case the pill is hidden rather than
+     * printing a false "0%", matching the no-data sentinel policy used elsewhere.
+     */
+    private void renderBattery(KioskSnapshot s) {
+        if (batteryText == null) return;
+
+        if (s.batteryPct < 0) {
+            if (batteryText.getVisibility() != View.GONE) {
+                batteryText.setVisibility(View.GONE);
+            }
+            return;
+        }
+        if (batteryText.getVisibility() != View.VISIBLE) {
+            batteryText.setVisibility(View.VISIBLE);
+        }
+
+        setIfChanged(batteryText, (s.charging ? "\u26A1 " : "") + s.batteryPct + "%");
+        int color = s.charging ? GOOD
+                : s.batteryPct <= 15 ? DANGER
+                : s.batteryPct <= 30 ? WARN
+                : MUTED;
+        setColorIfChanged(batteryText, color);
     }
 
     // =====================================================================

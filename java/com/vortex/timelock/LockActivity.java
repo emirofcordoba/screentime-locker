@@ -479,10 +479,17 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         container = new KioskContainer(this);
         container.setBackgroundColor(BG);
 
+        // FrameLayout: the centred lock message, plus the battery read-out pinned
+        // to the same top-right corner the full dashboard uses, so the corner never
+        // goes blank during the brief direct-boot window.
+        FrameLayout frame = new FrameLayout(this);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
         root.setPadding(dp(24), dp(24), dp(24), dp(24));
+        root.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         android.widget.TextView title = new android.widget.TextView(this);
         title.setText("Screen time lock active");
@@ -502,9 +509,59 @@ public class LockActivity extends Activity implements HardwareTick.Sink {
         lp.topMargin = dp(12);
         root.addView(sub, lp);
 
-        container.addView(root, new FrameLayout.LayoutParams(
+        frame.addView(root);
+
+        String battery = batteryLabel();
+        if (battery != null) {
+            android.widget.TextView batt = new android.widget.TextView(this);
+            batt.setText(battery);
+            batt.setTextColor(Color.parseColor("#C2CEDE"));
+            batt.setTextSize(13f);
+            batt.setTypeface(Ui.mono(), android.graphics.Typeface.BOLD);
+            batt.setGravity(Gravity.CENTER);
+            batt.setPadding(dp(11), dp(6), dp(11), dp(6));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setShape(GradientDrawable.RECTANGLE);
+            bg.setColor(Color.parseColor("#1F2C3E"));
+            bg.setCornerRadius(dp(14));
+            bg.setStroke(dp(1), Color.parseColor("#2C3B52"));
+            batt.setBackground(bg);
+            FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            blp.gravity = Gravity.TOP | Gravity.END;
+            blp.topMargin = dp(12);
+            blp.rightMargin = dp(6);
+            frame.addView(batt, blp);
+        }
+
+        container.addView(frame, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(container);
+    }
+
+    /**
+     * "82%" (or "\u26A1 82%" while charging) for the top-right corner, read from
+     * the sticky battery broadcast. Returns {@code null} when the level is unknown,
+     * so the caller can omit the read-out rather than print a false "0%". The
+     * device-protected broadcast is readable at direct boot, so this works on the
+     * pre-unlock path too.
+     */
+    private String batteryLabel() {
+        try {
+            Intent b = registerReceiver(null,
+                    new android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (b == null) return null;
+            int level = b.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+            int scale = b.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1);
+            if (level < 0 || scale <= 0) return null;
+            int pct = Math.round(level * 100f / scale);
+            int status = b.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+            boolean charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+            return (charging ? "\u26A1 " : "") + pct + "%";
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     // ======================================================================

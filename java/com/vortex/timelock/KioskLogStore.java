@@ -1,6 +1,9 @@
 package com.vortex.timelock;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.BatteryManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -75,7 +78,46 @@ final class KioskLogStore {
             events = events.subList(0, VISIBLE_MAX);
         }
 
+        // Battery: read the STICKY ACTION_BATTERY_CHANGED broadcast once per
+        // capture. registerReceiver(null, ...) does not register a live receiver,
+        // so this costs one cached-Intent read and no wake-up, which preserves the
+        // render path's zero-scheduling contract. -1 means the level is unknown;
+        // the dashboard then omits the read-out rather than printing a fake 0%.
+        Intent battery = stickyBattery(c);
+
         return new KioskSnapshot(nowMs, locked ? left : 0L, used, limit,
-                locked ? unlockAt : 0L, guardSeconds, locked, events);
+                locked ? unlockAt : 0L, guardSeconds,
+                batteryPercent(battery), batteryCharging(battery), locked, events);
+    }
+
+    /**
+     * The last {@code ACTION_BATTERY_CHANGED} broadcast, or {@code null}. Passing a
+     * {@code null} receiver to {@link Context#registerReceiver} returns the sticky
+     * Intent without subscribing, so no receiver, no filter and no listener lives
+     * after this call returns.
+     */
+    private static Intent stickyBattery(Context c) {
+        try {
+            return c.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Charge percentage (0..100) parsed from a battery sticky Intent, or -1. */
+    private static int batteryPercent(Intent b) {
+        if (b == null) return -1;
+        int level = b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = b.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+        if (level < 0 || scale <= 0) return -1;
+        return Math.round(level * 100f / scale);
+    }
+
+    /** True while the battery reports CHARGING or FULL. */
+    private static boolean batteryCharging(Intent b) {
+        if (b == null) return false;
+        int status = b.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+        return status == BatteryManager.BATTERY_STATUS_CHARGING
+                || status == BatteryManager.BATTERY_STATUS_FULL;
     }
 }

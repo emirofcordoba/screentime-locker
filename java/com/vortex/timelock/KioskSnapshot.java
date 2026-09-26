@@ -30,19 +30,26 @@ final class KioskSnapshot {
     final long unlockAtMs;
     /** Display-sleep watchdog: seconds until the panel blanks, or -1 if disabled. */
     final int guardSeconds;
+    /** Battery charge percentage (0..100), or -1 when the level is unknown. */
+    final int batteryPct;
+    /** True while the device is charging / plugged in. */
+    final boolean charging;
     /** True while the lock screen is enforced. */
     final boolean locked;
     /** Newest-first history, already humanised by {@link KioskLogParser}. */
     final List<KioskLogEvent> events;
 
     KioskSnapshot(long nowMs, long remainingMs, long usedMs, long limitMs, long unlockAtMs,
-                  int guardSeconds, boolean locked, List<KioskLogEvent> events) {
+                  int guardSeconds, int batteryPct, boolean charging,
+                  boolean locked, List<KioskLogEvent> events) {
         this.nowMs = nowMs;
         this.remainingMs = Math.max(0L, remainingMs);
         this.usedMs = Math.max(0L, usedMs);
         this.limitMs = Math.max(0L, limitMs);
         this.unlockAtMs = Math.max(0L, unlockAtMs);
         this.guardSeconds = guardSeconds;
+        this.batteryPct = batteryPct < 0 ? -1 : Math.min(100, batteryPct);
+        this.charging = charging;
         this.locked = locked;
         this.events = events == null ? Collections.<KioskLogEvent>emptyList() : events;
     }

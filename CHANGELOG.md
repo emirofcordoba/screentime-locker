@@ -2,6 +2,16 @@
 
 Notable changes to Screen Time Locker, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and [Semantic Versioning](https://semver.org/).
 
+## 6.10 - 2026-09-26
+
+### Added
+- **Battery percentage in the kiosk lock screen's top-right corner.** While the kiosk (lock) mode is active, the lock screen now shows the charge level as a small pill in the top-right corner - `82%`, or `\u26A1 82%` while the device is charging - tinted by level (muted above 30%, amber at 30% or below, red at 15% or below). It is painted on both the live lock screen (`KioskDashboard`) and the brief direct-boot (pre-unlock) projection (`LockActivity`), so the corner is never blank from the instant the framework is up.
+
+### Notes
+- The level is read once per tick from the STICKY `ACTION_BATTERY_CHANGED` broadcast via `registerReceiver(null, ...)`, which returns the cached Intent **without registering a live receiver**. No `BroadcastReceiver`, `BatteryManager` listener, wakelock or self-scheduled timer is added, so the render path keeps its zero-wake, zero-battery contract. The value rides on the existing `KioskSnapshot` (`batteryPct`, `charging`) like every other number the dashboard paints.
+- The read-out is diffed before writing, so a tick that does not change the charge performs no invalidation. When the level is unknown (`-1`) the pill is hidden rather than printing a false `0%`, matching the app-wide no-data sentinel policy.
+- Version bumped from 6.9 (versionCode 30) to 6.10 (versionCode 31).
+
 ## 6.9 - 2026-09-26
 
 ### Added
